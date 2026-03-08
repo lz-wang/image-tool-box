@@ -1,8 +1,10 @@
+# GO 图像工具箱
 
+## 图像压缩
 
-## 外部依赖
+### 外部依赖
 
-### libjpeg-turbo 有损压缩JPG
+#### libjpeg-turbo 有损压缩JPG
 
 - 仓库地址: <https://github.com/libjpeg-turbo/libjpeg-turbo.git>
 - 当前版本: [Release 3.1.3 · libjpeg-turbo/libjpeg-turbo](https://github.com/libjpeg-turbo/libjpeg-turbo/releases/tag/3.1.3)
@@ -25,14 +27,36 @@ cmake .. \
 make -j
 ```
 
-### pngquant 有损压缩PNG
+#### pngquant 有损压缩PNG
 
 - 仓库地址: <https://github.com/kornelski/pngquant>
 - 项目网站: [pngquant — lossy PNG compressor](https://pngquant.org/)
 - 当前版本: 
 
-### oxipng 无损压缩PNG
+#### oxipng 无损压缩PNG
 
 
 - 仓库地址: <https://github.com/oxipng/oxipng.git>
 - 当前版本: [Release v10.1.0 · oxipng/oxipng](https:-//github.com/oxipng/oxipng/releases/tag/v10.1.0)
+
+### 使用方法
+
+TODO
+
+## 图像水印
+
+### 位置水印
+
+TODO
+
+### 重复水印
+
+## 图像上传
+
+### S3上传
+
+TODO
+
+### LskyPro 上传
+
+TODO
