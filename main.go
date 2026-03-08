@@ -6,7 +6,7 @@ import (
 	"os"
 
 	"github.com/spf13/cobra"
-	"img-compress/internal/compress"
+	"imagetoolbox/internal/compress"
 )
 
 //go:embed bins/**
@@ -28,7 +28,7 @@ func main() {
 }
 
 var rootCmd = &cobra.Command{
-	Use:   "img-compress",
+	Use:   "imagetoolbox",
 	Short: "高效的图片压缩工具",
 	Long: `一个基于 pngquant、oxipng 和 libjpeg-turbo 的图片压缩 CLI 工具。
 

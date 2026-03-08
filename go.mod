@@ -1,4 +1,4 @@
-module img-compress
+module imagetoolbox
 
 go 1.26.1
 
