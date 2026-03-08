@@ -2,7 +2,10 @@
   "permissions": {
     "allow": [
       "Bash(go build -o pngcompress .)",
-      "Bash(./pngcompress -h)"
+      "Bash(./pngcompress -h)",
+      "Bash(file:*)",
+      "Bash(go build:*)",
+      "Bash(./img-compress:*)"
     ]
   }
 }
