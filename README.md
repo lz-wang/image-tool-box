@@ -153,3 +153,7 @@ TODO
 ### LskyPro 上传
 
 TODO
+
+## 许可证
+
+本项目使用 MIT 许可证。内置的第三方工具请参阅 [LICENSE-THIRD-PARTY.md](./LICENSE-THIRD-PARTY.md)。
