@@ -166,7 +166,7 @@ func SaveImage(img image.Image, path string, jpgBackground color.NRGBA) error {
 // AddRepeatWatermark adds a repeated text watermark and saves the output.
 func AddRepeatWatermark(inputPath, outputPath, text string, opts *RepeatOptions) (image.Image, error) {
 	var colorVal = "#4db6ac"
-	var spaceVal = 75
+	var space *int
 	var angleVal = 30
 	var opacityVal = 0.5
 	var fontSize *int
@@ -177,9 +177,7 @@ func AddRepeatWatermark(inputPath, outputPath, text string, opts *RepeatOptions)
 		if opts.Color != nil {
 			colorVal = *opts.Color
 		}
-		if opts.Space != nil {
-			spaceVal = *opts.Space
-		}
+		space = opts.Space
 		if opts.Angle != nil {
 			angleVal = *opts.Angle
 		}
@@ -207,6 +205,14 @@ func AddRepeatWatermark(inputPath, outputPath, text string, opts *RepeatOptions)
 		width := im.Bounds().Dx()
 		height := im.Bounds().Dy()
 		fontSizeVal = max(min(width, height)/25, 16)
+	}
+
+	// 如果未指定间距，则根据字体大小自动计算
+	var spaceVal int
+	if space != nil && *space > 0 {
+		spaceVal = *space
+	} else {
+		spaceVal = fontSizeVal * 2
 	}
 
 	args := WatermarkArgs{

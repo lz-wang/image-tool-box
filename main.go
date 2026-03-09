@@ -121,7 +121,7 @@ func init() {
 	watermarkCmd.Flags().StringVarP(&wmText, "text", "t", "", "水印文字")
 	watermarkCmd.Flags().StringVarP(&wmMode, "mode", "m", "position", "水印模式: position（位置）/ repeat（重复平铺）")
 	watermarkCmd.Flags().StringVar(&wmColor, "color", "#4db6ac", "水印颜色（repeat模式）")
-	watermarkCmd.Flags().IntVar(&wmSpace, "space", 75, "平铺间距（repeat模式）")
+	watermarkCmd.Flags().IntVar(&wmSpace, "space", 0, "平铺间距（0表示自动计算）")
 	watermarkCmd.Flags().IntVar(&wmAngle, "angle", 30, "旋转角度（repeat模式）")
 	watermarkCmd.Flags().Float64Var(&wmOpacity, "opacity", 0.5, "透明度 (0~1)")
 	watermarkCmd.Flags().StringVar(&wmFontPath, "font", "", "字体文件路径")
