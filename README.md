@@ -80,13 +80,72 @@ make build
 
 ## 图像水印
 
-### 位置水印
+为图片添加文字水印，支持两种模式：位置水印（单点）和重复平铺水印。
 
-TODO
+### 位置水印（position）
 
-### 重复水印
+在指定位置添加单个水印，自动根据背景亮度选择黑/白文字颜色，并添加描边提高可读性。
 
-TODO
+```bash
+# 默认右下角
+./itb watermark -i photo.jpg -t "© Author"
+
+# 指定位置
+./itb watermark -i photo.png -t "Copyright" -p center
+
+# 调整透明度
+./itb watermark -i photo.png -t "Author" --opacity 0.8
+
+# 指定输出路径
+./itb watermark -i photo.jpg -t "Author" -o output.jpg
+```
+
+#### 位置参数
+
+| 值 | 说明 |
+|----|------|
+| `bottom-right` | 右下角（默认） |
+| `bottom-left` | 左下角 |
+| `top-right` | 右上角 |
+| `top-left` | 左上角 |
+| `center` | 居中 |
+
+### 重复平铺水印（repeat）
+
+文字以平铺方式覆盖整张图片，支持旋转角度和间距调整。
+
+```bash
+# 基本用法
+./itb watermark -i photo.png -t "WATERMARK" --mode repeat
+
+# 自定义旋转角度和透明度
+./itb watermark -i photo.png -t "DRAFT" --mode repeat --angle 45 --opacity 0.3
+
+# 自定义颜色和间距
+./itb watermark -i photo.png -t "CONFIDENTIAL" --mode repeat --color "#FF0000" --space 100
+```
+
+### 命令参数
+
+| 参数 | 默认值 | 说明 |
+|------|--------|------|
+| `-i, --input` | (必填) | 输入图片路径 |
+| `-t, --text` | (必填) | 水印文字 |
+| `-o, --output` | `xxx_watermarked.ext` | 输出路径（默认在原文件名后加 `_watermarked`） |
+| `-m, --mode` | position | 水印模式：position / repeat |
+| `-p, --position` | bottom-right | 水印位置（position 模式） |
+| `--margin` | 0.04 | 边距比例（position 模式） |
+| `--opacity` | 0.5 | 透明度 0~1，数值越大字体颜色越深 |
+| `--color` | #4db6ac | 水印颜色（repeat 模式） |
+| `--angle` | 30 | 旋转角度（repeat 模式） |
+| `--space` | 75 | 平铺间距（repeat 模式） |
+| `--font-size` | 48 | 字体大小（repeat 模式） |
+| `--font` | (自动) | 字体文件路径（不指定则自动使用系统字体） |
+
+### 字体说明
+
+- **位置水印**：自动使用系统字体，无需指定
+- **重复水印**：默认使用内置 Go 字体，可通过 `--font` 指定自定义字体
 
 ## 图像上传
 

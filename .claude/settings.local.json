@@ -6,7 +6,9 @@
       "Bash(file:*)",
       "Bash(go build:*)",
       "Bash(./img-compress:*)",
-      "WebSearch"
+      "WebSearch",
+      "Bash(go get:*)",
+      "Bash(./itb watermark:*)"
     ]
   }
 }
