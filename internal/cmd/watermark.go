@@ -32,7 +32,7 @@ var watermarkCmd = &cobra.Command{
 
 1. position（默认）: 单点位置水印，在指定位置添加水印
    - 自动根据背景亮度选择黑/白文字
-   - 支持自动描边提高可读性
+   - 支持指定自定义颜色
 
 2. repeat: 重复平铺水印，文字以平铺方式覆盖整张图片
    - 支持旋转角度和间距调整
@@ -58,7 +58,7 @@ func init() {
 	watermarkCmd.Flags().StringVarP(&wmOutputFile, "output", "o", "", "输出图片文件路径（默认在原文件名后加 _watermarked）")
 	watermarkCmd.Flags().StringVarP(&wmText, "text", "t", "", "水印文字")
 	watermarkCmd.Flags().StringVarP(&wmMode, "mode", "m", "position", "水印模式: position（位置）/ repeat（重复平铺）")
-	watermarkCmd.Flags().StringVar(&wmColor, "color", "", "水印颜色（repeat模式，空表示自动选择）")
+	watermarkCmd.Flags().StringVar(&wmColor, "color", "", "水印颜色（空表示自动选择）")
 	watermarkCmd.Flags().IntVar(&wmSpace, "space", 0, "平铺间距（0表示自动计算）")
 	watermarkCmd.Flags().IntVar(&wmAngle, "angle", 30, "旋转角度（repeat模式）")
 	watermarkCmd.Flags().Float64Var(&wmOpacity, "opacity", 0.5, "透明度 (0~1)")
