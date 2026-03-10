@@ -144,11 +144,116 @@ make build
 | `--angle` | `30` | 旋转角度（度） |
 | `--space` | `0` | 平铺间距，`0` 表示根据字体大小自动计算 |
 
-## 图像上传
+## S3 兼容存储操作
 
-### S3上传
+支持 AWS S3、MinIO、阿里云 OSS、腾讯云 COS 等所有 S3 协议兼容的存储服务。
 
-TODO
+### 环境变量
+
+```bash
+S3_ENDPOINT             # S3 端点 URL（可选）
+S3_ACCESS_KEY_ID        # Access Key
+S3_SECRET_ACCESS_KEY    # Secret Key
+S3_REGION               # 区域（默认 us-east-1）
+```
+
+### 公共参数
+
+所有 S3 子命令共享以下参数：
+
+| 参数 | 默认值 | 说明 |
+|------|--------|------|
+| `-e, --endpoint` | (必填) | S3 端点 URL |
+| `-a, --access-key` | (环境变量) | Access Key ID |
+| `-s, --secret-key` | (环境变量) | Secret Access Key |
+| `-r, --region` | `us-east-1` | 区域 |
+| `-b, --bucket` | (必填) | 存储桶名称 |
+| `--force-path-style` | `false` | 强制路径样式 URL（MinIO 需要） |
+
+### 上传文件
+
+```bash
+# 上传文件到存储桶
+./itb s3 upload -i photo.jpg -b my-bucket -e http://localhost:9000
+
+# 指定对象键名（默认使用文件名）
+./itb s3 upload -i photo.jpg -b my-bucket -k images/photo.jpg
+
+# 指定 Content-Type
+./itb s3 upload -i data.json -b my-bucket --content-type application/json
+```
+
+#### upload 参数
+
+| 参数 | 说明 |
+|------|------|
+| `-i, --input` | 本地文件路径（必填） |
+| `-k, --key` | 对象键名（默认使用文件名） |
+| `--content-type` | 内容类型（自动检测） |
+
+### 下载文件
+
+```bash
+# 下载文件
+./itb s3 download -b my-bucket -k photo.jpg -o ./photo.jpg
+
+# 使用对象键名作为本地文件名
+./itb s3 download -b my-bucket -k images/photo.jpg
+```
+
+#### download 参数
+
+| 参数 | 说明 |
+|------|------|
+| `-k, --key` | 对象键名（必填） |
+| `-o, --output` | 本地输出路径（默认使用对象键名） |
+
+### 删除对象
+
+```bash
+# 删除对象（需要确认）
+./itb s3 delete -b my-bucket -k photo.jpg
+
+# 强制删除（不需要确认）
+./itb s3 delete -b my-bucket -k photo.jpg -f
+```
+
+#### delete 参数
+
+| 参数 | 说明 |
+|------|------|
+| `-k, --key` | 对象键名（必填） |
+| `-f, --force` | 强制删除，不确认 |
+
+### 列出对象
+
+```bash
+# 列出所有对象
+./itb s3 list -b my-bucket
+
+# 按前缀过滤
+./itb s3 list -b my-bucket -p images/
+
+# JSON 格式输出
+./itb s3 list -b my-bucket --format json
+```
+
+#### list 参数
+
+| 参数 | 默认值 | 说明 |
+|------|--------|------|
+| `-p, --prefix` | | 对象键前缀 |
+| `--max-keys` | `1000` | 最大返回数量 |
+| `--format` | `table` | 输出格式：`table` / `json` / `plain` |
+
+### 云服务商配置示例
+
+| 云服务商 | Endpoint 示例 | ForcePathStyle |
+|---------|---------------|----------------|
+| AWS S3 | `https://s3.amazonaws.com` | `false` |
+| MinIO | `http://localhost:9000` | `true` |
+| 阿里云 OSS | `https://oss-cn-hangzhou.aliyuncs.com` | `false` |
+| 腾讯云 COS | `https://cos.ap-guangzhou.myqcloud.com` | `false` |
 
 ### LskyPro 上传
 
