@@ -12,10 +12,15 @@ var (
 // rootCmd 根命令
 var rootCmd = &cobra.Command{
 	Use:   "imagetoolbox",
-	Short: "高效的图片压缩工具",
-	Long: `一个基于 pngquant、oxipng 和 libjpeg-turbo 的图片压缩 CLI 工具。
+	Short: "图片处理工具箱",
+	Long: `一个图片处理 CLI 工具箱，提供压缩、水印、S3 存储操作等功能。
 
-支持 PNG 和 JPEG 格式的高效压缩，所有依赖二进制已内嵌，无需外部依赖。`,
+功能:
+  - compress: 图片压缩（PNG/JPEG），基于 pngquant、oxipng 和 libjpeg-turbo
+  - watermark: 添加文字水印，支持位置和重复平铺两种模式
+  - s3: S3 兼容存储操作（上传、下载、删除、列表）
+
+所有依赖二进制已内嵌，无需外部依赖。`,
 }
 
 // Execute 执行根命令
