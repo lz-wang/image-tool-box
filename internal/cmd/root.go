@@ -19,6 +19,7 @@ var rootCmd = &cobra.Command{
   - compress: 图片压缩（PNG/JPEG），基于 pngquant、oxipng 和 libjpeg-turbo
   - watermark: 添加文字水印，支持位置和重复平铺两种模式
   - s3: S3 兼容存储操作（上传、下载、删除、列表）
+  - lsky: 上传图片到 LskyPro 图床
 
 所有依赖二进制已内嵌，无需外部依赖。`,
 }

@@ -257,7 +257,40 @@ S3_REGION               # 区域（默认 us-east-1）
 
 ### LskyPro 上传
 
-TODO
+支持上传图片到 LskyPro 图床，兼容直接传站点根地址或完整的 `/api/v1` 地址。
+
+### 环境变量
+
+```bash
+LSKY_URL    # LskyPro 地址，例如 https://img.example.com 或 https://img.example.com/api/v1
+LSKY_TOKEN  # API Token
+```
+
+### 上传图片
+
+```bash
+# 使用环境变量上传
+./itb lsky upload -i photo.jpg
+
+# 显式指定服务地址和 Token
+./itb lsky upload -i photo.jpg --url https://img.example.com --token your-token
+
+# 指定存储策略 ID
+./itb lsky upload -i photo.jpg --strategy 2
+
+# 输出 Markdown 链接
+./itb lsky upload -i photo.jpg --link-format markdown
+```
+
+#### upload 参数
+
+| 参数 | 默认值 | 说明 |
+|------|--------|------|
+| `-i, --input` | (必填) | 本地图片路径 |
+| `--url` | (环境变量) | LskyPro 服务地址 |
+| `--token` | (环境变量) | LskyPro API Token |
+| `-s, --strategy` | `0` | 存储策略 ID，`0` 表示不指定 |
+| `--link-format` | `url` | 快捷输出链接格式：`url` / `markdown` / `bbcode` / `html` / `markdown-with-link` / `thumbnail` |
 
 ## 许可证
 
