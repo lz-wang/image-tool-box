@@ -21,11 +21,29 @@ const (
 
 // binaryPaths 定义不同平台的二进制文件路径
 var binaryPaths = map[string]map[BinaryType]string{
+	"darwin-amd64": {
+		PngQuant: "bins/macos-amd64/pngquant",
+		OxiPng:   "bins/macos-amd64/oxipng",
+		DJpeg:    "bins/macos-amd64/djpeg-static",
+		CJpeg:    "bins/macos-amd64/cjpeg-static",
+	},
 	"darwin-arm64": {
 		PngQuant: "bins/macos-arm64/pngquant",
 		OxiPng:   "bins/macos-arm64/oxipng",
 		DJpeg:    "bins/macos-arm64/djpeg-static",
 		CJpeg:    "bins/macos-arm64/cjpeg-static",
+	},
+	"linux-amd64": {
+		PngQuant: "bins/linux-amd64/pngquant",
+		OxiPng:   "bins/linux-amd64/oxipng",
+		DJpeg:    "bins/linux-amd64/djpeg-static",
+		CJpeg:    "bins/linux-amd64/cjpeg-static",
+	},
+	"linux-arm64": {
+		PngQuant: "bins/linux-arm64/pngquant",
+		OxiPng:   "bins/linux-arm64/oxipng",
+		DJpeg:    "bins/linux-arm64/djpeg-static",
+		CJpeg:    "bins/linux-arm64/cjpeg-static",
 	},
 }
 
