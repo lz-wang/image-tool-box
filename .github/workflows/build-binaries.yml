@@ -52,17 +52,35 @@ jobs:
         with:
           go-version-file: go.mod
 
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
       - name: Install build dependencies (Linux)
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y build-essential cmake nasm
+          sudo apt-get install -y build-essential cmake nasm pkg-config
 
       - name: Install build dependencies (macOS)
         if: runner.os == 'macOS'
         run: |
           brew update
           brew install nasm
+
+      - name: Build pngquant and oxipng
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          mkdir -p "${{ matrix.target.bins_dir }}"
+
+          git clone --depth 1 --branch 3.0.3 --recursive https://github.com/kornelski/pngquant.git /tmp/pngquant
+          cargo build --manifest-path /tmp/pngquant/Cargo.toml --release --locked
+          install -m 0755 /tmp/pngquant/target/release/pngquant "${{ matrix.target.bins_dir }}/pngquant"
+
+          git clone --depth 1 --branch v10.1.0 https://github.com/oxipng/oxipng.git /tmp/oxipng
+          cargo build --manifest-path /tmp/oxipng/Cargo.toml --release --locked
+          install -m 0755 /tmp/oxipng/target/release/oxipng "${{ matrix.target.bins_dir }}/oxipng"
 
       - name: Build libjpeg-turbo static tools
         shell: bash
@@ -76,8 +94,6 @@ jobs:
             -DCMAKE_BUILD_TYPE=Release \
             ${{ matrix.target.cmake_extra_args }}
           cmake --build /tmp/libjpeg-turbo/build --parallel
-
-          mkdir -p "${{ matrix.target.bins_dir }}"
           install -m 0755 /tmp/libjpeg-turbo/build/cjpeg-static "${{ matrix.target.bins_dir }}/cjpeg-static"
           install -m 0755 /tmp/libjpeg-turbo/build/djpeg-static "${{ matrix.target.bins_dir }}/djpeg-static"
           if [[ -f /tmp/libjpeg-turbo/build/jpegtran-static ]]; then
