@@ -75,11 +75,19 @@ jobs:
           mkdir -p "${{ matrix.target.bins_dir }}"
 
           git clone --depth 1 --branch 3.0.3 --recursive https://github.com/kornelski/pngquant.git /tmp/pngquant
-          cargo build --manifest-path /tmp/pngquant/Cargo.toml --release --locked
+          pngquant_lock_flag=""
+          if [[ -f /tmp/pngquant/Cargo.lock ]]; then
+            pngquant_lock_flag="--locked"
+          fi
+          cargo build --manifest-path /tmp/pngquant/Cargo.toml --release ${pngquant_lock_flag}
           install -m 0755 /tmp/pngquant/target/release/pngquant "${{ matrix.target.bins_dir }}/pngquant"
 
           git clone --depth 1 --branch v10.1.0 https://github.com/oxipng/oxipng.git /tmp/oxipng
-          cargo build --manifest-path /tmp/oxipng/Cargo.toml --release --locked
+          oxipng_lock_flag=""
+          if [[ -f /tmp/oxipng/Cargo.lock ]]; then
+            oxipng_lock_flag="--locked"
+          fi
+          cargo build --manifest-path /tmp/oxipng/Cargo.toml --release ${oxipng_lock_flag}
           install -m 0755 /tmp/oxipng/target/release/oxipng "${{ matrix.target.bins_dir }}/oxipng"
 
       - name: Build libjpeg-turbo static tools
