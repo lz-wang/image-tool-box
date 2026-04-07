@@ -11,6 +11,43 @@
 
 构建方式
 
+下面补充 macOS / Linux 下 `amd64` 与 `arm64` 的静态构建示例。
+
+其他平台可按相同方式分别构建静态版本的 `cjpeg` / `djpeg`。建议统一使用 `-DENABLE_SHARED=FALSE -DENABLE_STATIC=TRUE`，并按目标平台创建单独的构建目录。
+
+构建完成后，可执行文件通常位于构建目录下，常见产物包括：
+
+- `cjpeg-static`
+- `djpeg-static`
+- `jpegtran-static`
+
+建议在本项目中按 `bins/<os>-<arch>/` 组织，例如：
+
+- `bins/macos-amd64/`
+- `bins/macos-arm64/`
+- `bins/linux-amd64/`
+- `bins/linux-arm64/`
+
+##### macOS amd64
+
+```bash
+git clone https://github.com/libjpeg-turbo/libjpeg-turbo.git
+cd libjpeg-turbo
+
+mkdir build-macos-amd64
+cd build-macos-amd64
+
+cmake .. \
+  -DENABLE_SHARED=FALSE \
+  -DENABLE_STATIC=TRUE \
+  -DCMAKE_OSX_ARCHITECTURES=x86_64 \
+  -DCMAKE_BUILD_TYPE=Release
+
+make -j
+```
+
+##### macOS arm64
+
 ```bash
 git clone https://github.com/libjpeg-turbo/libjpeg-turbo.git
 cd libjpeg-turbo
@@ -21,11 +58,65 @@ cd build-macos-arm64
 cmake .. \
   -DENABLE_SHARED=FALSE \
   -DENABLE_STATIC=TRUE \
-  -DCMAKE_OSX_ARCHITECTURES=x86_64 \
+  -DCMAKE_OSX_ARCHITECTURES=arm64 \
   -DCMAKE_BUILD_TYPE=Release
 
 make -j
 ```
+
+##### Linux amd64
+
+```bash
+git clone https://github.com/libjpeg-turbo/libjpeg-turbo.git
+cd libjpeg-turbo
+
+mkdir build-linux-amd64
+cd build-linux-amd64
+
+cmake .. \
+  -DENABLE_SHARED=FALSE \
+  -DENABLE_STATIC=TRUE \
+  -DCMAKE_SYSTEM_NAME=Linux \
+  -DCMAKE_SYSTEM_PROCESSOR=x86_64 \
+  -DCMAKE_BUILD_TYPE=Release
+
+make -j
+```
+
+##### Linux arm64
+
+如果在 arm64 Linux 主机原生构建：
+
+```bash
+git clone https://github.com/libjpeg-turbo/libjpeg-turbo.git
+cd libjpeg-turbo
+
+mkdir build-linux-arm64
+cd build-linux-arm64
+
+cmake .. \
+  -DENABLE_SHARED=FALSE \
+  -DENABLE_STATIC=TRUE \
+  -DCMAKE_SYSTEM_NAME=Linux \
+  -DCMAKE_SYSTEM_PROCESSOR=aarch64 \
+  -DCMAKE_BUILD_TYPE=Release
+
+make -j
+```
+
+如果在其他平台交叉编译，需要额外指定 toolchain，例如：
+
+```bash
+cmake .. \
+  -DENABLE_SHARED=FALSE \
+  -DENABLE_STATIC=TRUE \
+  -DCMAKE_SYSTEM_NAME=Linux \
+  -DCMAKE_SYSTEM_PROCESSOR=aarch64 \
+  -DCMAKE_TOOLCHAIN_FILE=/path/to/toolchain.cmake \
+  -DCMAKE_BUILD_TYPE=Release
+```
+
+如果要接入当前项目，还需要将对应平台产物复制到本仓库的 `bins/<os>-<arch>/` 目录，并在 [internal/compress/embed.go](/Users/lzwang/projects/ImageToolBox/internal/compress/embed.go) 中补充对应平台的二进制映射。
 
 #### pngquant 有损压缩PNG
 
