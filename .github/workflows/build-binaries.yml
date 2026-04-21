@@ -285,3 +285,34 @@ jobs:
           name: itb-${{ matrix.target.name }}
           path: dist/${{ matrix.target.name }}/
           if-no-files-found: error
+
+  notify:
+    name: Notify Build Result
+    runs-on: ubuntu-24.04
+    needs: build
+    if: always()
+
+    steps:
+      - name: Notify via Pushover
+        if: ${{ secrets.PUSHOVER_TOKEN != '' && secrets.PUSHOVER_USER != '' }}
+        env:
+          PUSHOVER_TOKEN: ${{ secrets.PUSHOVER_TOKEN }}
+          PUSHOVER_USER: ${{ secrets.PUSHOVER_USER }}
+        run: |
+          MESSAGE=$(cat <<'EOF'
+          <b>ImageToolBox CI 通知</b>
+          <u>工作流</u>: <i>${{ github.workflow }}</i>
+          <u>构建结果</u>: ${{ needs.build.result == 'success' && '<font color="#00aa00"><b>success</b></font>' || format('<font color="#cc0000"><b>{0}</b></font>', needs.build.result) }}
+          <u>分支</u>: <i>${{ github.ref_name }}</i>
+          <u>触发人</u>: <i>${{ github.actor }}</i>
+          <a href="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}">查看运行详情</a>
+          <u>提交内容</u>:
+          ${{ github.event.head_commit.message || github.event.pull_request.title || 'workflow_dispatch' }}
+          EOF
+          )
+          curl -fsS https://api.pushover.net/1/messages.json \
+            --data-urlencode "token=${PUSHOVER_TOKEN}" \
+            --data-urlencode "user=${PUSHOVER_USER}" \
+            --data-urlencode "title=ImageToolBox CI 通知" \
+            --data-urlencode "html=1" \
+            --data-urlencode "message=${MESSAGE}"

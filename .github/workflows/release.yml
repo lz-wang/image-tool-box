@@ -327,3 +327,36 @@ jobs:
           tag_name: ${{ env.RELEASE_TAG }}
           generate_release_notes: true
           files: release-assets/*
+
+  notify:
+    name: Notify Release Result
+    runs-on: ubuntu-24.04
+    needs: [build, publish]
+    if: always()
+
+    steps:
+      - name: Notify via Pushover
+        if: ${{ secrets.PUSHOVER_TOKEN != '' && secrets.PUSHOVER_USER != '' }}
+        env:
+          PUSHOVER_TOKEN: ${{ secrets.PUSHOVER_TOKEN }}
+          PUSHOVER_USER: ${{ secrets.PUSHOVER_USER }}
+        run: |
+          MESSAGE=$(cat <<'EOF'
+          <b>ImageToolBox Release 通知</b>
+          <u>工作流</u>: <i>${{ github.workflow }}</i>
+          <u>构建结果</u>: ${{ needs.build.result == 'success' && '<font color="#00aa00"><b>success</b></font>' || format('<font color="#cc0000"><b>{0}</b></font>', needs.build.result) }}
+          <u>发布结果</u>: ${{ needs.publish.result == 'success' && '<font color="#00aa00"><b>success</b></font>' || format('<font color="#cc0000"><b>{0}</b></font>', needs.publish.result) }}
+          <u>版本</u>: <font color="#0000ff">${{ env.RELEASE_TAG }}</font>
+          <u>分支/标签</u>: <i>${{ github.ref_name }}</i>
+          <u>触发人</u>: <i>${{ github.actor }}</i>
+          <a href="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}">查看运行详情</a>
+          <u>提交内容</u>:
+          ${{ github.event.head_commit.message || github.event.pull_request.title || inputs.tag || 'workflow_dispatch' }}
+          EOF
+          )
+          curl -fsS https://api.pushover.net/1/messages.json \
+            --data-urlencode "token=${PUSHOVER_TOKEN}" \
+            --data-urlencode "user=${PUSHOVER_USER}" \
+            --data-urlencode "title=ImageToolBox Release 通知" \
+            --data-urlencode "html=1" \
+            --data-urlencode "message=${MESSAGE}"
