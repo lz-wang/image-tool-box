@@ -4,6 +4,14 @@
 
 外部依赖说明见 [docs/build-bins.md](docs/build-bins.md)。
 
+CI 当前会并行构建以下平台：
+
+- macOS amd64 / arm64
+- Linux amd64 / arm64
+- Windows amd64 / arm64
+
+Release 产物中，macOS / Linux 使用 `.tar.gz`，Windows 使用 `.zip`；Windows 可执行文件和内置压缩工具均带 `.exe` 扩展名。
+
 ### 使用方法
 
 #### 构建

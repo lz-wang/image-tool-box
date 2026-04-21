@@ -10,6 +10,15 @@
 - `bins/macos-arm64/`
 - `bins/linux-amd64/`
 - `bins/linux-arm64/`
+- `bins/windows-amd64/`
+- `bins/windows-arm64/`
+
+其中 Windows 平台产物统一使用 `.exe` 扩展名，例如：
+
+- `pngquant.exe`
+- `oxipng.exe`
+- `cjpeg-static.exe`
+- `djpeg-static.exe`
 
 ## libjpeg-turbo
 
@@ -114,17 +123,31 @@ cmake .. \
 
 构建完成后，将对应平台产物复制到本仓库的 `bins/<os>-<arch>/` 目录，并在 [internal/compress/embed.go](/Users/lzwang/projects/ImageToolBox/internal/compress/embed.go) 中补充或校验对应平台的二进制映射。
 
+### Windows amd64 / arm64
+
+建议在对应架构的 Windows Runner 或主机上原生构建。CI 中当前使用 GitHub Actions Windows Runner 原生构建 `pngquant`、`oxipng` 和 `libjpeg-turbo`，并将产物放入：
+
+- `bins/windows-amd64/`
+- `bins/windows-arm64/`
+
+`libjpeg-turbo` 在 Windows 上建议使用 CMake + Visual Studio 生成器，常见输出包括：
+
+- `Release/cjpeg-static.exe`
+- `Release/djpeg-static.exe`
+
+发布阶段，Windows 构建产物使用 `.zip` 打包；macOS / Linux 保持 `.tar.gz`。
+
 ## pngquant
 
 - 仓库地址: <https://github.com/kornelski/pngquant>
 - 项目网站: [pngquant — lossy PNG compressor](https://pngquant.org/)
 - 当前版本: 3.0.3
 
-CI 中当前通过源码构建 `pngquant`，也可以复用 workflow 中的做法手工构建。
+CI 中当前通过源码构建 `pngquant`，也可以复用 workflow 中的做法在 macOS、Linux、Windows 上手工构建。
 
 ## oxipng
 
 - 仓库地址: <https://github.com/oxipng/oxipng.git>
 - 当前版本: [Release v10.1.0 · oxipng/oxipng](https://github.com/oxipng/oxipng/releases/tag/v10.1.0)
 
-CI 中当前通过源码构建 `oxipng`，也可以复用 workflow 中的做法手工构建。
+CI 中当前通过源码构建 `oxipng`，也可以复用 workflow 中的做法在 macOS、Linux、Windows 上手工构建。

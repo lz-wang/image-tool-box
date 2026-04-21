@@ -27,24 +27,48 @@ jobs:
             goos: darwin
             goarch: amd64
             bins_dir: bins/macos-amd64
+            exe_suffix: ""
+            archive_ext: tar.gz
             cmake_extra_args: -DCMAKE_OSX_ARCHITECTURES=x86_64
           - name: macos-arm64
             runs_on: macos-15
             goos: darwin
             goarch: arm64
             bins_dir: bins/macos-arm64
+            exe_suffix: ""
+            archive_ext: tar.gz
             cmake_extra_args: -DCMAKE_OSX_ARCHITECTURES=arm64
           - name: linux-amd64
             runs_on: ubuntu-24.04
             goos: linux
             goarch: amd64
             bins_dir: bins/linux-amd64
+            exe_suffix: ""
+            archive_ext: tar.gz
             cmake_extra_args: ""
           - name: linux-arm64
             runs_on: ubuntu-24.04-arm
             goos: linux
             goarch: arm64
             bins_dir: bins/linux-arm64
+            exe_suffix: ""
+            archive_ext: tar.gz
+            cmake_extra_args: ""
+          - name: windows-amd64
+            runs_on: windows-2025
+            goos: windows
+            goarch: amd64
+            bins_dir: bins/windows-amd64
+            exe_suffix: .exe
+            archive_ext: zip
+            cmake_extra_args: ""
+          - name: windows-arm64
+            runs_on: windows-11-arm
+            goos: windows
+            goarch: arm64
+            bins_dir: bins/windows-arm64
+            exe_suffix: .exe
+            archive_ext: zip
             cmake_extra_args: ""
 
     steps:
@@ -71,7 +95,14 @@ jobs:
           brew update
           brew install nasm
 
-      - name: Build pngquant and oxipng
+      - name: Install build dependencies (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          choco install -y cmake nasm
+
+      - name: Build pngquant and oxipng (Unix)
+        if: runner.os != 'Windows'
         shell: bash
         run: |
           set -euo pipefail
@@ -94,7 +125,31 @@ jobs:
           cargo build --manifest-path /tmp/oxipng/Cargo.toml --release ${oxipng_lock_flag}
           install -m 0755 /tmp/oxipng/target/release/oxipng "${{ matrix.target.bins_dir }}/oxipng"
 
-      - name: Build libjpeg-turbo static tools
+      - name: Build pngquant and oxipng (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $binsDir = "${{ matrix.target.bins_dir }}"
+          New-Item -ItemType Directory -Force -Path $binsDir | Out-Null
+
+          $pngquantDir = Join-Path $env:RUNNER_TEMP "pngquant"
+          if (Test-Path $pngquantDir) { Remove-Item -Recurse -Force $pngquantDir }
+          git clone --depth 1 --branch 3.0.3 --recursive https://github.com/kornelski/pngquant.git $pngquantDir
+          $pngquantArgs = @("build", "--manifest-path", (Join-Path $pngquantDir "Cargo.toml"), "--release")
+          if (Test-Path (Join-Path $pngquantDir "Cargo.lock")) { $pngquantArgs += "--locked" }
+          cargo @pngquantArgs
+          Copy-Item (Join-Path $pngquantDir "target\release\pngquant.exe") (Join-Path $binsDir "pngquant.exe")
+
+          $oxipngDir = Join-Path $env:RUNNER_TEMP "oxipng"
+          if (Test-Path $oxipngDir) { Remove-Item -Recurse -Force $oxipngDir }
+          git clone --depth 1 --branch v10.1.0 https://github.com/oxipng/oxipng.git $oxipngDir
+          $oxipngArgs = @("build", "--manifest-path", (Join-Path $oxipngDir "Cargo.toml"), "--release")
+          if (Test-Path (Join-Path $oxipngDir "Cargo.lock")) { $oxipngArgs += "--locked" }
+          cargo @oxipngArgs
+          Copy-Item (Join-Path $oxipngDir "target\release\oxipng.exe") (Join-Path $binsDir "oxipng.exe")
+
+      - name: Build libjpeg-turbo static tools (Unix)
+        if: runner.os != 'Windows'
         shell: bash
         run: |
           set -euo pipefail
@@ -112,7 +167,50 @@ jobs:
             install -m 0755 /tmp/libjpeg-turbo/build/jpegtran-static "${{ matrix.target.bins_dir }}/jpegtran-static"
           fi
 
-      - name: Verify required bundled binaries
+      - name: Build libjpeg-turbo static tools (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $binsDir = "${{ matrix.target.bins_dir }}"
+          $libjpegDir = Join-Path $env:RUNNER_TEMP "libjpeg-turbo"
+          $buildDir = Join-Path $libjpegDir "build"
+          $cmakeArch = if ("${{ matrix.target.goarch }}" -eq "arm64") { "ARM64" } else { "x64" }
+
+          if (Test-Path $libjpegDir) { Remove-Item -Recurse -Force $libjpegDir }
+          git clone --depth 1 --branch 3.1.3 https://github.com/libjpeg-turbo/libjpeg-turbo.git $libjpegDir
+
+          cmake -S $libjpegDir -B $buildDir -A $cmakeArch -DENABLE_SHARED=FALSE -DENABLE_STATIC=TRUE -DCMAKE_BUILD_TYPE=Release
+          cmake --build $buildDir --config Release --parallel
+
+          $candidates = @{
+            "cjpeg-static.exe" = @(
+              (Join-Path $buildDir "Release\cjpeg-static.exe"),
+              (Join-Path $buildDir "cjpeg-static.exe")
+            )
+            "djpeg-static.exe" = @(
+              (Join-Path $buildDir "Release\djpeg-static.exe"),
+              (Join-Path $buildDir "djpeg-static.exe")
+            )
+          }
+
+          foreach ($fileName in $candidates.Keys) {
+            $source = $null
+            foreach ($candidate in $candidates[$fileName]) {
+              if (Test-Path $candidate) {
+                $source = $candidate
+                break
+              }
+            }
+
+            if (-not $source) {
+              throw "Expected libjpeg-turbo artifact not found: $fileName"
+            }
+
+            Copy-Item $source (Join-Path $binsDir $fileName)
+          }
+
+      - name: Verify required bundled binaries (Unix)
+        if: runner.os != 'Windows'
         shell: bash
         run: |
           set -euo pipefail
@@ -122,7 +220,27 @@ jobs:
           test -x "${{ matrix.target.bins_dir }}/cjpeg-static"
           test -x "${{ matrix.target.bins_dir }}/djpeg-static"
 
-      - name: Build itb
+      - name: Verify required bundled binaries (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $binsDir = "${{ matrix.target.bins_dir }}"
+          $required = @(
+            "pngquant.exe",
+            "oxipng.exe",
+            "cjpeg-static.exe",
+            "djpeg-static.exe"
+          )
+
+          foreach ($fileName in $required) {
+            $path = Join-Path $binsDir $fileName
+            if (-not (Test-Path $path)) {
+              throw "Missing bundled binary: $path"
+            }
+          }
+
+      - name: Build itb (Unix)
+        if: runner.os != 'Windows'
         env:
           GOOS: ${{ matrix.target.goos }}
           GOARCH: ${{ matrix.target.goarch }}
@@ -131,13 +249,35 @@ jobs:
           mkdir -p dist/${{ matrix.target.name }}
           go build -trimpath -ldflags "-s -w" -o dist/${{ matrix.target.name }}/itb .
 
-      - name: Package platform binaries
+      - name: Build itb (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        env:
+          GOOS: ${{ matrix.target.goos }}
+          GOARCH: ${{ matrix.target.goarch }}
+          CGO_ENABLED: "0"
+        run: |
+          $distDir = Join-Path "dist" "${{ matrix.target.name }}"
+          New-Item -ItemType Directory -Force -Path $distDir | Out-Null
+          go build -trimpath -ldflags "-s -w" -o (Join-Path $distDir "itb.exe") .
+
+      - name: Package platform binaries (Unix)
+        if: runner.os != 'Windows'
         shell: bash
         run: |
           set -euo pipefail
 
           mkdir -p dist/${{ matrix.target.name }}/bins
           cp -R "${{ matrix.target.bins_dir }}" "dist/${{ matrix.target.name }}/bins/"
+
+      - name: Package platform binaries (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $distDir = Join-Path "dist" "${{ matrix.target.name }}"
+          $distBinsDir = Join-Path $distDir "bins"
+          New-Item -ItemType Directory -Force -Path $distBinsDir | Out-Null
+          Copy-Item "${{ matrix.target.bins_dir }}" $distBinsDir -Recurse
 
       - name: Upload binary artifact
         uses: actions/upload-artifact@v4

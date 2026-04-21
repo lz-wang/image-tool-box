@@ -45,6 +45,18 @@ var binaryPaths = map[string]map[BinaryType]string{
 		DJpeg:    "bins/linux-arm64/djpeg-static",
 		CJpeg:    "bins/linux-arm64/cjpeg-static",
 	},
+	"windows-amd64": {
+		PngQuant: "bins/windows-amd64/pngquant.exe",
+		OxiPng:   "bins/windows-amd64/oxipng.exe",
+		DJpeg:    "bins/windows-amd64/djpeg-static.exe",
+		CJpeg:    "bins/windows-amd64/cjpeg-static.exe",
+	},
+	"windows-arm64": {
+		PngQuant: "bins/windows-arm64/pngquant.exe",
+		OxiPng:   "bins/windows-arm64/oxipng.exe",
+		DJpeg:    "bins/windows-arm64/djpeg-static.exe",
+		CJpeg:    "bins/windows-arm64/cjpeg-static.exe",
+	},
 }
 
 var (
@@ -62,6 +74,13 @@ func InitBinaries(fs embed.FS) {
 // getPlatformKey 获取当前平台的 key
 func getPlatformKey() string {
 	return fmt.Sprintf("%s-%s", runtime.GOOS, runtime.GOARCH)
+}
+
+func extractedBinaryName(binType BinaryType) string {
+	if runtime.GOOS == "windows" {
+		return string(binType) + ".exe"
+	}
+	return string(binType)
 }
 
 // EnsureBinary 确保二进制文件可用，返回临时文件路径
@@ -100,7 +119,7 @@ func extractAllBinaries() error {
 			return fmt.Errorf("failed to read embedded binary %s: %w", binType, err)
 		}
 
-		targetPath := filepath.Join(tmpDir, string(binType))
+		targetPath := filepath.Join(tmpDir, extractedBinaryName(binType))
 
 		// 检查是否已存在且大小相同
 		if info, err := os.Stat(targetPath); err == nil {
