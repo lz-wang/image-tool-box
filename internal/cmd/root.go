@@ -17,8 +17,11 @@ var rootCmd = &cobra.Command{
 
 功能:
   - crop: 图片裁剪，基于锚点和百分比保留目标区域
+  - resize: 图片缩放，支持 fit/fill/stretch
   - compress: 图片压缩（PNG/JPEG），基于 pngquant、oxipng 和 libjpeg-turbo
+  - convert: 图片格式转换，支持 JPEG/PNG/WEBP
   - watermark: 添加文字水印，支持位置和重复平铺两种模式
+  - batch: 批量执行 resize/convert/watermark
   - s3: S3 兼容存储操作（上传、下载、删除、列表）
   - lsky: 上传图片到 LskyPro 图床
 
