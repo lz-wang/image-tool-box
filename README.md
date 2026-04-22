@@ -1,7 +1,5 @@
 # GO 图像工具箱
 
-## 图像压缩
-
 外部依赖说明见 [docs/build-bins.md](docs/build-bins.md)。
 
 CI 当前会并行构建以下平台：
@@ -94,6 +92,63 @@ xattr -d com.apple.quarantine your_binary
 - `top` / `bottom` 必须提供 `--height`，且不能提供 `--width`
 - `top-left` / `top-right` / `bottom-left` / `bottom-right` / `center` 必须同时提供 `--width` 和 `--height`
 
+## 图像缩放
+
+支持按宽高、百分比和不同模式调整图片尺寸。
+
+```bash
+# 指定宽度，按比例缩放
+./itb resize -i photo.jpg --width 1200
+
+# 指定宽高框，保持比例适配
+./itb resize -i photo.jpg --width 1200 --height 630 --mode fit
+
+# 指定宽高框并裁切填满
+./itb resize -i photo.jpg --width 1200 --height 630 --mode fill --anchor top
+
+# 按百分比缩放
+./itb resize -i photo.png --percent 50%
+```
+
+### 命令参数
+
+| 参数 | 默认值 | 说明 |
+|------|--------|------|
+| `-i, --input` | (必填) | 输入图片路径 |
+| `-o, --output` | `*_resized.*` | 输出路径 |
+| `--width` | | 目标宽度 |
+| `--height` | | 目标高度 |
+| `--percent` | | 按比例缩放，例如 `50%` |
+| `--mode` | `fit` | 缩放模式：`fit` / `fill` / `stretch` |
+| `--anchor` | `center` | `fill` 模式的锚点 |
+| `--filter` | `lanczos` | 采样器：`nearest` / `linear` / `catmullrom` / `lanczos` |
+
+## 图像格式转换
+
+支持 `jpg/jpeg/png/webp` 互转，输出格式由 `--to` 指定。
+
+```bash
+# 转为 WebP
+./itb convert -i photo.png --to webp
+
+# 透明 PNG 转 JPG，指定铺底颜色
+./itb convert -i photo.png --to jpg --background "#FFFFFF"
+
+# 指定输出路径
+./itb convert -i photo.jpg --to png -o output.png
+```
+
+### 命令参数
+
+| 参数 | 默认值 | 说明 |
+|------|--------|------|
+| `-i, --input` | (必填) | 输入图片路径 |
+| `-o, --output` | `*_converted.<ext>` | 输出路径 |
+| `--to` | (必填) | 目标格式：`jpg` / `jpeg` / `png` / `webp` |
+| `-q, --quality` | `80` | 有损格式质量 |
+| `--lossless` | `false` | 无损编码（webp/png） |
+| `--background` | `#FFFFFF` | 转不透明格式时的背景色 |
+
 ## 图像水印
 
 为图片添加文字水印，支持两种模式：位置水印（单点）和重复平铺水印。
@@ -114,6 +169,9 @@ xattr -d com.apple.quarantine your_binary
 
 # 指定输出路径
 ./itb watermark -i photo.jpg -t "Author" -o output.jpg
+
+# 添加图片水印
+./itb watermark -i photo.jpg --image logo.png --scale 0.2 --position bottom-right
 ```
 
 ### 重复平铺水印（repeat）
@@ -145,6 +203,9 @@ xattr -d com.apple.quarantine your_binary
 | `--opacity` | `0.5` | 透明度，范围 0~1 |
 | `--font-size` | `0` | 字体大小，`0` 表示根据图片自动计算 |
 | `--font` | (自动) | 字体文件路径，空则自动使用系统字体 |
+| `--image` | | 图片水印路径，与 `--text` 二选一 |
+| `--scale` | `0.2` | 图片水印缩放比例，基于底图短边 |
+| `--tile` | `false` | 图片平铺水印，当前版本暂不支持 |
 
 #### position 模式参数
 
@@ -159,6 +220,33 @@ xattr -d com.apple.quarantine your_binary
 |------|--------|------|
 | `--angle` | `30` | 旋转角度（度） |
 | `--space` | `0` | 平铺间距，`0` 表示根据字体大小自动计算 |
+
+## 批量处理
+
+支持批量执行 `resize`、`convert`、`watermark`，输出目录保留相对目录结构。
+
+```bash
+# 批量缩放
+./itb batch resize --input-dir ./images --output-dir ./out --recursive --width 1200
+
+# 批量转 WebP
+./itb batch convert --input-dir ./images --output-dir ./out --glob "*.png" --to webp
+
+# 批量添加文字水印
+./itb batch watermark --input-dir ./images --output-dir ./out -t "© Author"
+```
+
+### 公共参数
+
+| 参数 | 默认值 | 说明 |
+|------|--------|------|
+| `--input-dir` | (必填) | 输入目录 |
+| `--output-dir` | (必填) | 输出目录 |
+| `--glob` | `*` | 文件匹配模式 |
+| `--recursive` | `false` | 递归处理子目录 |
+| `--workers` | `4` | 并发 worker 数 |
+| `--skip-existing` | `false` | 输出已存在时跳过 |
+| `--fail-fast` | `false` | 遇错尽快停止 |
 
 ## S3 兼容存储操作
 
