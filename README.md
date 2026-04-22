@@ -1,32 +1,25 @@
 # GO 图像工具箱
 
-外部依赖说明见 [docs/build-bins.md](docs/build-bins.md)。
+> 外部依赖说明见 [docs/build-bins.md](docs/build-bins.md)。
+> 
+> CI 当前会并行构建以下平台：
+> 
+> - macOS amd64 / arm64
+> - Linux amd64 / arm64
+> - Windows amd64 / arm64
+> 
+> Release 产物中，macOS / Linux 使用 `.tar.gz`，Windows 使用 `.zip`；Windows 可执行文件和内置压缩工具均带 `.exe` 扩展名。
 
-CI 当前会并行构建以下平台：
+> [!WARNING]
+> **macOS 运行提示**
+>
+> 如果在 macOS 上运行二进制时提示“无法验证开发者”，并且每次都需要到“安全性与隐私”里手动放行，内部使用场景下可以在下载或解压后先移除 `quarantine` 标记：
+>
+> ```bash
+> xattr -d com.apple.quarantine your_binary
+> ```
 
-- macOS amd64 / arm64
-- Linux amd64 / arm64
-- Windows amd64 / arm64
-
-Release 产物中，macOS / Linux 使用 `.tar.gz`，Windows 使用 `.zip`；Windows 可执行文件和内置压缩工具均带 `.exe` 扩展名。
-
-### 使用方法
-
-#### 构建
-
-```bash
-make build
-```
-
-#### macOS 运行提示
-
-如果在 macOS 上运行二进制时提示“无法验证开发者”，并且每次都需要到“安全性与隐私”里手动放行，内部使用场景下可以在下载或解压后先移除 `quarantine` 标记：
-
-```bash
-xattr -d com.apple.quarantine your_binary
-```
-
-#### 压缩图片
+## 压缩图片
 
 自动检测图片格式（PNG/JPEG）并压缩：
 
@@ -359,7 +352,7 @@ S3_REGION               # 区域（默认 us-east-1）
 | 阿里云 OSS | `https://oss-cn-hangzhou.aliyuncs.com` | `false` |
 | 腾讯云 COS | `https://cos.ap-guangzhou.myqcloud.com` | `false` |
 
-### LskyPro 上传
+## LskyPro 上传
 
 支持上传图片到 LskyPro 图床，兼容直接传站点根地址或完整的 `/api/v1` 地址。
 
