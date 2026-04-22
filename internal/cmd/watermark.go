@@ -14,6 +14,7 @@ var (
 	wmInputFile  string
 	wmOutputFile string
 	wmText       string
+	wmImagePath  string
 	wmMode       string
 	wmColor      string
 	wmSpace      int
@@ -23,6 +24,8 @@ var (
 	wmFontSize   int
 	wmPosition   string
 	wmMargin     float64
+	wmScale      float64
+	wmTile       bool
 )
 
 var watermarkCmd = &cobra.Command{
@@ -57,6 +60,7 @@ func init() {
 	watermarkCmd.Flags().StringVarP(&wmInputFile, "input", "i", "", "输入图片文件路径")
 	watermarkCmd.Flags().StringVarP(&wmOutputFile, "output", "o", "", "输出图片文件路径（默认在原文件名后加 _watermarked）")
 	watermarkCmd.Flags().StringVarP(&wmText, "text", "t", "", "水印文字")
+	watermarkCmd.Flags().StringVar(&wmImagePath, "image", "", "图片水印路径")
 	watermarkCmd.Flags().StringVarP(&wmMode, "mode", "m", "position", "水印模式: position（位置）/ repeat（重复平铺）")
 	watermarkCmd.Flags().StringVar(&wmColor, "color", "", "水印颜色（空表示自动选择）")
 	watermarkCmd.Flags().IntVar(&wmSpace, "space", 0, "平铺间距（0表示自动计算）")
@@ -66,17 +70,18 @@ func init() {
 	watermarkCmd.Flags().IntVar(&wmFontSize, "font-size", 0, "字体大小（0表示自动计算）")
 	watermarkCmd.Flags().StringVar(&wmPosition, "position", "bottom-right", "水印位置: bottom-right/bottom-left/top-right/top-left/center")
 	watermarkCmd.Flags().Float64Var(&wmMargin, "margin", 0.04, "边距比例（position模式）")
+	watermarkCmd.Flags().Float64Var(&wmScale, "scale", 0.2, "图片水印缩放比例（相对底图短边）")
+	watermarkCmd.Flags().BoolVar(&wmTile, "tile", false, "图片水印平铺（当前版本暂不支持）")
 
 	watermarkCmd.MarkFlagRequired("input")
-	watermarkCmd.MarkFlagRequired("text")
 }
 
 func runWatermark(cmd *cobra.Command, args []string) error {
 	if wmInputFile == "" {
 		return fmt.Errorf("必须指定输入文件路径 (-i)")
 	}
-	if wmText == "" {
-		return fmt.Errorf("必须指定水印文字 (-t)")
+	if err := validateWatermarkInput(); err != nil {
+		return err
 	}
 
 	// 生成默认输出路径
@@ -89,33 +94,55 @@ func runWatermark(cmd *cobra.Command, args []string) error {
 	}
 
 	var err error
-	switch wmMode {
-	case "repeat":
-		opts := &watermark.RepeatOptions{
-			Color:          &wmColor,
-			Space:          &wmSpace,
-			Angle:          &wmAngle,
-			Opacity:        &wmOpacity,
-			FontPath:       wmFontPath,
-			FontSize:       &wmFontSize,
-			FontHeightCrop: nil,
+	switch {
+	case wmImagePath != "":
+		if wmMode != "position" {
+			return fmt.Errorf("图片水印仅支持 position 模式")
 		}
-		_, err = watermark.AddRepeatWatermark(wmInputFile, outputPath, wmText, opts)
-
-	case "position":
+		if wmTile {
+			return fmt.Errorf("图片平铺水印暂不支持")
+		}
 		pos := watermark.Position(wmPosition)
-		opts := &watermark.PositionOptions{
+		opts := &watermark.ImageOptions{
+			ImagePath:   wmImagePath,
 			Opacity:     &wmOpacity,
 			Position:    pos,
-			FontPath:    wmFontPath,
-			FontSize:    &wmFontSize,
-			Color:       &wmColor,
+			ScaleRatio:  &wmScale,
 			MarginRatio: &wmMargin,
 		}
-		_, err = watermark.AddPositionWatermark(wmInputFile, outputPath, wmText, opts)
+		_, err = watermark.AddImageWatermark(wmInputFile, outputPath, opts)
 
+	case wmText != "":
+		switch wmMode {
+		case "repeat":
+			opts := &watermark.RepeatOptions{
+				Color:          &wmColor,
+				Space:          &wmSpace,
+				Angle:          &wmAngle,
+				Opacity:        &wmOpacity,
+				FontPath:       wmFontPath,
+				FontSize:       &wmFontSize,
+				FontHeightCrop: nil,
+			}
+			_, err = watermark.AddRepeatWatermark(wmInputFile, outputPath, wmText, opts)
+
+		case "position":
+			pos := watermark.Position(wmPosition)
+			opts := &watermark.PositionOptions{
+				Opacity:     &wmOpacity,
+				Position:    pos,
+				FontPath:    wmFontPath,
+				FontSize:    &wmFontSize,
+				Color:       &wmColor,
+				MarginRatio: &wmMargin,
+			}
+			_, err = watermark.AddPositionWatermark(wmInputFile, outputPath, wmText, opts)
+
+		default:
+			return fmt.Errorf("不支持的水印模式: %s（支持: position, repeat）", wmMode)
+		}
 	default:
-		return fmt.Errorf("不支持的水印模式: %s（支持: position, repeat）", wmMode)
+		return fmt.Errorf("必须指定水印文字 (-t) 或图片水印 (--image)")
 	}
 
 	if err != nil {
@@ -123,5 +150,15 @@ func runWatermark(cmd *cobra.Command, args []string) error {
 	}
 
 	fmt.Printf("水印添加完成: %s\n", outputPath)
+	return nil
+}
+
+func validateWatermarkInput() error {
+	if wmText == "" && wmImagePath == "" {
+		return fmt.Errorf("必须指定 --text 或 --image")
+	}
+	if wmText != "" && wmImagePath != "" {
+		return fmt.Errorf("--text 与 --image 不能同时使用")
+	}
 	return nil
 }
