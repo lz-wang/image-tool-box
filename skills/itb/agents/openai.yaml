@@ -1,0 +1,4 @@
+interface:
+  display_name: "ITB"
+  short_description: "Use the itb CLI for image workflows"
+  default_prompt: "Use $itb to process images with the itb CLI."

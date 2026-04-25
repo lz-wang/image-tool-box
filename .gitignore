@@ -2,3 +2,5 @@ libjpeg-turbo
 bins
 test-images
 itb
+!skills/itb/
+!skills/itb/**
