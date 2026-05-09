@@ -214,6 +214,37 @@
 | `--angle` | `30` | 旋转角度（度） |
 | `--space` | `0` | 平铺间距，`0` 表示根据字体大小自动计算 |
 
+## 图片检查
+
+读取图片文件信息、图像基本信息、详细元数据和文件 hash。
+
+```bash
+# 默认表格输出，默认计算所有 hash，默认输出详细数据
+./itb inspect -i photo.jpg
+
+# JSON 输出
+./itb inspect -i photo.jpg --format json
+
+# 只输出 sha256
+./itb inspect -i photo.jpg --format plain
+
+# 关闭详细数据
+./itb inspect -i photo.jpg --detail=false
+
+# 不计算 hash
+./itb inspect -i photo.jpg --no-hash
+```
+
+### 命令参数
+
+| 参数 | 默认值 | 说明 |
+|------|--------|------|
+| `-i, --input` | (必填) | 输入图片路径 |
+| `--format` | `table` | 输出格式：`table` / `json` / `plain` |
+| `--detail` | `true` | 输出详细元数据 |
+| `--no-hash` | `false` | 不计算文件 hash |
+| `--strict` | `false` | 图像解析失败时直接返回错误 |
+
 ## 批量处理
 
 支持批量执行 `resize`、`convert`、`watermark`，输出目录保留相对目录结构。
