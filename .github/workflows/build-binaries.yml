@@ -67,6 +67,17 @@ jobs:
           go test ./... -skip '^TestMinIO(Integration|CLIE2E)$' -covermode=atomic -coverprofile=coverage.out
           go test -race ./internal/compress ./internal/httpapi
 
+      # MinIO 集成/E2E 先于 Codecov 执行：功能正确性验证绝不依赖
+      # 第三方 coverage 服务的可用性。
+      - name: Run MinIO domain integration tests
+        run: go test ./internal/s3 -run '^TestMinIOIntegration$' -v
+
+      - name: Run MinIO CLI end-to-end tests
+        run: go test ./internal/s3 -run '^TestMinIOCLIE2E$' -v
+
+      # Codecov 与功能正确性解耦：coverage 上传失败（受保护分支缺
+      # CODECOV_TOKEN、第三方服务故障）只降级为警告，不得再阻断
+      # 后续检查与构建矩阵。
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v7
         with:
@@ -74,13 +85,7 @@ jobs:
           files: coverage.out
           flags: backend
           name: backend
-          fail_ci_if_error: true
-
-      - name: Run MinIO domain integration tests
-        run: go test ./internal/s3 -run '^TestMinIOIntegration$' -v
-
-      - name: Run MinIO CLI end-to-end tests
-        run: go test ./internal/s3 -run '^TestMinIOCLIE2E$' -v
+          fail_ci_if_error: false
 
   build:
     name: ${{ matrix.target.name }}
