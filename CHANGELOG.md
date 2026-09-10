@@ -34,6 +34,7 @@ All notable changes to this project will be documented in this file.
 - **收尾 1** `fix(ci)`：MinIO 集成/CLI E2E 移至 Codecov 上传之前执行，`fail_ci_if_error` 降为 false——coverage 服务故障或受保护分支缺 token 不再阻断功能验证与构建矩阵。
 - **收尾 2** `fix(cli)` 补完 `itb.error.v1` 分类 taxonomy：Action 内参数错误（operand 数量、flag 组合冲突）引入 typed `InvalidArgumentError`，不再误报 `E_INTERNAL`；provider 限流错误码（SlowDown/Throttling 等）稳定映射 `E_THROTTLED`（`ErrorDetail` 新增 Throttled 标记，5xx 保持 `E_NETWORK` 可重试）；`InvalidAccessKeyId`/`SignatureDoesNotMatch`/`ExpiredToken` 及 HTTP 401 映射为 `E_INVALID_CREDENTIALS`（与"凭证未配置"、403 `E_ACCESS_DENIED` 区分）；`WrapError` 全分支以双 `%w` 保留原始 provider 错误链，保证 `provider_code`/`http_status` 可提取。
 - **收尾 3** `fix(compress)` 稳定源快照消除 TOCTOU：新增内部原语 `internal/stablefile`（复制到私有临时快照 + 单遍 SHA-256 + 可观察变化检测），compress 的输入摘要、格式检测与压缩管道全部基于同一份快照——报告中的 input sha256/size 从此与实际压缩内容严格对应，源文件在处理期间被替换时以 `E_SOURCE_CHANGED` 失败；S3 upload 的快照逻辑迁移至同一原语，消除两处重复实现。输入必须是普通文件（FIFO/目录直接参数错误，不再可能在 open 阶段阻塞）。
+- **收尾 4** `fix(s3)` 修复 download 本地复用的组合语义漏洞：`--verify` 或 `--expect-content-type` 在 `--if-exists verify` 复用路径此前可能被完全跳过（有显式 `--verify-sha256` 时不执行 HEAD）。现在复用不降低校验强度——`--verify` 与 `--expect-content-type` 强制先 HEAD 比对远端 itb-sha256 / Content-Type，显式 digest 与远端 metadata 矛盾时直接 `E_TARGET_CONFLICT`；只有 `--verify-sha256`（+ 可选 `--expect-size`）保持零网络复用。CLI help 与双语 README 同步更新组合语义。
 
 ## [v0.9.3] - 2026-09-03
 

@@ -283,3 +283,139 @@ func TestDownloadV2ResultSchema(t *testing.T) {
 func containsError(err error, target error) bool {
 	return errors.Is(err, target)
 }
+
+// seedRemoteObject 预置一个带 itb-sha256 的远端对象并清空方法记录，
+// 供复用组合语义测试断言后续请求序列。
+func seedRemoteObject(t *testing.T, contentType string, tamper func(h http.Header, size *int64)) (*objectState, *Client) {
+	t.Helper()
+
+	state, client := newUploadVerifyTestServer(t)
+	state.tamper = tamper
+	if _, err := Upload(context.Background(), client, writeUploadFixture(t), "hello.txt", &UploadOptions{ContentType: contentType}); err != nil {
+		t.Fatalf("seed upload: %v", err)
+	}
+	state.mu.Lock()
+	state.methods = nil
+	state.mu.Unlock()
+	return state, client
+}
+
+// TestDownloadReuseVerifyCombinationMustHead --verify 与 --verify-sha256
+// 同时提供时复用必须执行 HEAD，本地副本要同时满足两个依据：
+// 远端 itb-sha256 与显式 digest 互相矛盾时直接失败，绝不 GET。
+func TestDownloadReuseVerifyCombinationMustHead(t *testing.T) {
+	t.Run("两者一致且本地匹配则复用", func(t *testing.T) {
+		state, client := seedRemoteObject(t, "text/plain", nil)
+		output := filepath.Join(t.TempDir(), "local.txt")
+		if err := os.WriteFile(output, []byte(helloContent), 0o644); err != nil {
+			t.Fatalf("seed local copy: %v", err)
+		}
+
+		result, err := Download(context.Background(), client, "hello.txt", output, &DownloadOptions{
+			Verify:       true,
+			VerifySHA256: helloSHA256,
+			IfExists:     IfExistsVerify,
+		})
+		if err != nil {
+			t.Fatalf("Download: %v", err)
+		}
+		if result.Status != StatusReused || result.SHA256 != helloSHA256 {
+			t.Fatalf("result = %+v, want reused", result)
+		}
+		assertMethods(t, state.snapshotMethods(), []string{http.MethodHead})
+	})
+
+	t.Run("远端 metadata 与显式 digest 矛盾则失败", func(t *testing.T) {
+		state, client := seedRemoteObject(t, "text/plain", func(h http.Header, size *int64) {
+			h.Set("x-amz-meta-itb-sha256", "deadbeef")
+		})
+		output := filepath.Join(t.TempDir(), "local.txt")
+		if err := os.WriteFile(output, []byte(helloContent), 0o644); err != nil {
+			t.Fatalf("seed local copy: %v", err)
+		}
+
+		_, err := Download(context.Background(), client, "hello.txt", output, &DownloadOptions{
+			Verify:       true,
+			VerifySHA256: helloSHA256,
+			IfExists:     IfExistsVerify,
+		})
+		if err == nil || !containsError(err, ErrExpectationMismatch) {
+			t.Fatalf("err = %v, want ErrExpectationMismatch", err)
+		}
+		assertMethods(t, state.snapshotMethods(), []string{http.MethodHead})
+		// 本地内容保持原状
+		if got, _ := os.ReadFile(output); string(got) != helloContent {
+			t.Errorf("local copy content = %q, want untouched", got)
+		}
+	})
+}
+
+// TestDownloadReuseExpectContentTypeMustHead --expect-content-type 与
+// --verify-sha256 组合：复用必须 HEAD 并校验远端 Content-Type，
+// 不得因有显式 digest 而跳过。
+func TestDownloadReuseExpectContentTypeMustHead(t *testing.T) {
+	t.Run("类型不一致则失败", func(t *testing.T) {
+		state, client := seedRemoteObject(t, "text/plain", nil)
+		output := filepath.Join(t.TempDir(), "local.txt")
+		if err := os.WriteFile(output, []byte(helloContent), 0o644); err != nil {
+			t.Fatalf("seed local copy: %v", err)
+		}
+
+		_, err := Download(context.Background(), client, "hello.txt", output, &DownloadOptions{
+			VerifySHA256:      helloSHA256,
+			ExpectContentType: "image/png",
+			IfExists:          IfExistsVerify,
+		})
+		if err == nil || !containsError(err, ErrExpectationMismatch) {
+			t.Fatalf("err = %v, want ErrExpectationMismatch", err)
+		}
+		assertMethods(t, state.snapshotMethods(), []string{http.MethodHead})
+	})
+
+	t.Run("类型一致（参数不敏感）则复用并回填 content_type", func(t *testing.T) {
+		state, client := seedRemoteObject(t, "text/plain; charset=utf-8", nil)
+		output := filepath.Join(t.TempDir(), "local.txt")
+		if err := os.WriteFile(output, []byte(helloContent), 0o644); err != nil {
+			t.Fatalf("seed local copy: %v", err)
+		}
+
+		result, err := Download(context.Background(), client, "hello.txt", output, &DownloadOptions{
+			VerifySHA256:      helloSHA256,
+			ExpectContentType: "Text/Plain",
+			IfExists:          IfExistsVerify,
+		})
+		if err != nil {
+			t.Fatalf("Download: %v", err)
+		}
+		if result.Status != StatusReused {
+			t.Fatalf("status = %q, want reused", result.Status)
+		}
+		if result.ContentType != "text/plain; charset=utf-8" {
+			t.Errorf("content_type = %q, want remote value", result.ContentType)
+		}
+		assertMethods(t, state.snapshotMethods(), []string{http.MethodHead})
+	})
+}
+
+// TestDownloadReuseVerifySHA256OnlyStaysZeroNetwork 只有 --verify-sha256
+// （+可选 --expect-size）保持零网络复用：0 × HEAD、0 × GET。
+func TestDownloadReuseVerifySHA256OnlyStaysZeroNetwork(t *testing.T) {
+	rec, client := newDownloadTestServer(t, []byte(helloContent))
+	output := filepath.Join(t.TempDir(), "local.txt")
+	if err := os.WriteFile(output, []byte(helloContent), 0o644); err != nil {
+		t.Fatalf("seed local copy: %v", err)
+	}
+
+	result, err := Download(context.Background(), client, "hello.txt", output, &DownloadOptions{
+		VerifySHA256: helloSHA256,
+		ExpectSize:   int64Ptr(int64(len(helloContent))),
+		IfExists:     IfExistsVerify,
+	})
+	if err != nil {
+		t.Fatalf("Download: %v", err)
+	}
+	if result.Status != StatusReused {
+		t.Fatalf("status = %q, want reused", result.Status)
+	}
+	assertMethods(t, rec.snapshotMethods(), nil)
+}

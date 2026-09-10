@@ -144,6 +144,9 @@ func Get(ctx context.Context, client *Client, key string) (*s3.GetObjectOutput, 
 // 复用（status=reused），存在但不一致返回 ErrExpectationMismatch，
 // 本地不存在则正常下载。没有任何校验依据时直接报
 // ErrReuseVerificationUnavailable——绝不"文件存在就复用"。
+// 复用不降低校验强度：--verify 与 --expect-content-type 在复用路径
+// 同样生效（先 HEAD 比对远端 itb-sha256 / Content-Type）；只有
+// --verify-sha256（+ 可选 --expect-size）才允许零网络复用。
 //
 // 本函数不输出任何内容：结果通过 DownloadResult 返回（Size 是实际
 // 写入本地的字节数），进度提示写入 opts.Progress，由 adapter
@@ -297,24 +300,45 @@ func Download(ctx context.Context, client *Client, key string, outputPath string
 
 // tryReuseLocalCopy 尝试按 --if-exists=verify 语义复用本地副本。
 // 返回 reused=false 表示应继续正常下载（本地副本不存在）。
+//
+// 组合语义（与正常下载路径的验证依据完全一致，不因复用而打折）：
+//
+//   - --verify 与 --expect-content-type 都要求远端状态在场，必须
+//     先 HEAD：--verify 要比对远端 itb-sha256，--expect-content-type
+//     要比对远端 Content-Type；
+//   - 同时提供 --verify 与 --verify-sha256 时，本地副本必须同时
+//     满足两个依据（且远端 itb-sha256 不得与显式 digest 矛盾）；
+//   - 只有 --verify-sha256（+ 可选 --expect-size）才允许真正的
+//     零网络复用（local-cache 语义）。
 func tryReuseLocalCopy(ctx context.Context, client *Client, key, outputPath string, options *DownloadOptions) (bool, *DownloadResult, error) {
 	if options.VerifySHA256 == "" && !options.Verify {
 		return false, nil, ErrReuseVerificationUnavailable
 	}
 
-	expectedSHA := strings.ToLower(options.VerifySHA256)
-	var remote *StatInfo
-	if expectedSHA == "" {
-		// 只有 --verify：先 HEAD 获取远端 itb-sha256 作为期望值
+	// 需要远端状态的组合：--verify（比对 itb-sha256）或
+	// --expect-content-type（比对 Content-Type）
+	needHead := options.Verify || options.ExpectContentType != ""
+	remote := (*StatInfo)(nil)
+	var remoteSHA string
+	if needHead {
 		info, err := Stat(ctx, client, key)
 		if err != nil {
 			return false, nil, err
 		}
 		remote = info
-		expectedSHA = strings.ToLower(info.Metadata[MetadataSHA256Key])
-		if expectedSHA == "" {
+		remoteSHA = strings.ToLower(info.Metadata[MetadataSHA256Key])
+		if options.Verify && remoteSHA == "" {
 			return false, nil, fmt.Errorf("%w: object %q has no %s metadata, cannot verify a local copy", ErrExpectationMismatch, key, MetadataSHA256Key)
 		}
+	}
+
+	// 期望 SHA：显式 digest 与远端 itb-sha256 必须同时满足；
+	// 两者同时在场且互相矛盾时没有本地副本能满足，直接失败
+	expectedSHA := strings.ToLower(options.VerifySHA256)
+	if expectedSHA == "" {
+		expectedSHA = remoteSHA
+	} else if remoteSHA != "" && remoteSHA != expectedSHA {
+		return false, nil, fmt.Errorf("%w: object %q %s metadata is %s, expected %s", ErrExpectationMismatch, key, MetadataSHA256Key, remoteSHA, expectedSHA)
 	}
 
 	if _, err := os.Stat(outputPath); err != nil {
@@ -338,6 +362,7 @@ func tryReuseLocalCopy(ctx context.Context, client *Client, key, outputPath stri
 	if options.ExpectSize != nil && local.BytesRead != *options.ExpectSize {
 		return false, nil, fmt.Errorf("%w: local copy %q size is %d, expected %d", ErrExpectationMismatch, outputPath, local.BytesRead, *options.ExpectSize)
 	}
+	// needHead 与 ExpectContentType != "" 等价：远端状态必在场
 	var contentType string
 	if remote != nil {
 		contentType = remote.ContentType

@@ -857,7 +857,11 @@ first HEADs the remote itb-sha256): a local copy whose size/SHA-256 provably
 matches is reused (JSON `status=reused`); a present-but-divergent copy fails
 with `E_TARGET_CONFLICT`; a missing copy downloads normally. With no
 verification basis at all it fails immediately with `E_INVALID_ARGUMENT` —
-"the file exists" is never sufficient.
+"the file exists" is never sufficient. Reuse never weakens verification:
+`--verify` and `--expect-content-type` stay enforced on the reuse path (one
+HEAD comparing the remote itb-sha256 / Content-Type; a remote metadata value
+contradicting an explicit digest fails immediately); only `--verify-sha256`
+(plus optional `--expect-size`) reuses with truly zero network access.
 
 The `--format json` contract is `itb.s3.download.v2` with new `status`
 (`downloaded` / `reused`) and `content_type` fields.

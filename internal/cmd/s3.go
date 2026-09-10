@@ -273,7 +273,11 @@ CONSTRAINTS:
   size/SHA-256 provably matches (--verify-sha256 or --verify
   required as a basis); a present-but-divergent copy fails
   with E_TARGET_CONFLICT, and a missing copy downloads
-  normally.
+  normally. Reuse never weakens verification: --verify and
+  --expect-content-type are enforced on the reuse path too
+  (one HEAD against the remote object); only --verify-sha256
+  (plus optional --expect-size) reuses with zero network
+  access.
 
 EXAMPLES:
   itb s3 download -b my-bucket photo.jpg ./photo.jpg

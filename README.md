@@ -816,7 +816,10 @@ v0.9.x 一致）。`verify` 只在调用方提供校验依据（`--verify-sha256
 时先 HEAD 取远端 itb-sha256）时才允许跳过 GET：本地副本 size/SHA-256 与期望
 一致则复用（JSON `status=reused`）；副本存在但不一致返回 `E_TARGET_CONFLICT`；
 本地不存在则正常下载。**没有任何校验依据时直接报 `E_INVALID_ARGUMENT`——绝不
-"文件存在就复用"。**
+"文件存在就复用"。** 复用不降低校验强度：`--verify` 与 `--expect-content-type`
+在复用路径同样生效（先 HEAD 比对远端 itb-sha256 / Content-Type，显式 digest
+与远端 metadata 矛盾时直接失败）；只有 `--verify-sha256`（+ 可选
+`--expect-size`）才允许真正的零网络复用。
 
 `--format json` 契约为 `itb.s3.download.v2`：新增 `status`（`downloaded` /
 `reused`）与 `content_type` 字段。
