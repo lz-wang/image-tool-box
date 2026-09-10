@@ -128,7 +128,7 @@ func runInspect(ctx context.Context, cmd *cli.Command) error {
 
 	case "plain":
 		if result.Hashes == nil || result.Hashes.SHA256 == "" {
-			return fmt.Errorf("plain 输出需要 sha256；请移除 --no-hash 或加上 --hash sha256")
+			return invalidArgument("plain 输出需要 sha256；请移除 --no-hash 或加上 --hash sha256")
 		}
 		fmt.Fprintln(os.Stdout, result.Hashes.SHA256)
 		return nil
@@ -137,6 +137,6 @@ func runInspect(ctx context.Context, cmd *cli.Command) error {
 		return inspect.PrintTable(os.Stdout, result)
 
 	default:
-		return fmt.Errorf("不支持的输出格式: %s（支持: table, json, plain）", cmd.String("format"))
+		return invalidArgument("不支持的输出格式: %s（支持: table, json, plain）", cmd.String("format"))
 	}
 }

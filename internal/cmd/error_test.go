@@ -411,9 +411,152 @@ func TestS3DetailFromError(t *testing.T) {
 	if !detail.Retryable {
 		t.Error("SlowDown must be retryable")
 	}
+	if !detail.Throttled {
+		t.Error("SlowDown must be marked throttled")
+	}
+
+	// 服务端临时故障可重试但不是限流
+	detail, _ = s3.DetailFromError(&fakeSmithyError{code: "InternalError"})
+	if !detail.Retryable || detail.Throttled {
+		t.Errorf("InternalError must be retryable but not throttled, got %+v", detail)
+	}
 
 	// fs.ErrNotExist 不误判为 provider 错误
 	var _ error = fs.ErrNotExist
+}
+
+// TestClassifyInvalidArgumentError Action 内 typed 参数错误必须归类为
+// E_INVALID_ARGUMENT，而不是兜底 E_INTERNAL。
+func TestClassifyInvalidArgumentError(t *testing.T) {
+	info := classifyError(invalidArgument("需要提供 <src>"))
+	if info.Code != CodeInvalidArgument {
+		t.Fatalf("code = %q, want %q", info.Code, CodeInvalidArgument)
+	}
+	if info.Message != "需要提供 <src>" {
+		t.Errorf("message = %q", info.Message)
+	}
+
+	wrapped := fmt.Errorf("compress: %w", invalidArgument("--in-place 不能与 <dst> 同时使用"))
+	if info := classifyError(wrapped); info.Code != CodeInvalidArgument {
+		t.Errorf("wrapped code = %q, want %q", info.Code, CodeInvalidArgument)
+	}
+}
+
+// TestExecuteArgsActionArgErrorJSON --format json 下 Action 内的参数
+// 错误（缺 operand）同样输出 E_INVALID_ARGUMENT。
+func TestExecuteArgsActionArgErrorJSON(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+	err := ExecuteArgs(context.Background(), "test", []string{"itb", "inspect", "--format", "json"}, &stdout, &stderr)
+	if !errors.Is(err, ErrReported) {
+		t.Fatalf("err = %v, want ErrReported", err)
+	}
+
+	var decoded MachineError
+	if err := json.Unmarshal(stdout.Bytes(), &decoded); err != nil {
+		t.Fatalf("stdout is not one JSON document: %v\n%s", err, stdout.String())
+	}
+	if decoded.Operation != "inspect" {
+		t.Errorf("operation = %q, want inspect", decoded.Operation)
+	}
+	if decoded.Error.Code != CodeInvalidArgument {
+		t.Errorf("code = %q, want %q", decoded.Error.Code, CodeInvalidArgument)
+	}
+	if !strings.Contains(decoded.Error.Message, "<src>") {
+		t.Errorf("message = %q, want the operand hint", decoded.Error.Message)
+	}
+	if stderr.Len() != 0 {
+		t.Errorf("stderr must stay empty, got %q", stderr.String())
+	}
+}
+
+// TestClassifyThrottledProviderError 限流 provider 错误稳定映射为
+// E_THROTTLED；一般可重试的 5xx 保持 E_NETWORK。
+func TestClassifyThrottledProviderError(t *testing.T) {
+	info := classifyError(fmt.Errorf("wrap: %w", &fakeSmithyError{code: "SlowDown"}))
+	if info.Code != CodeThrottled || !info.Retryable {
+		t.Errorf("SlowDown classified = %+v", info)
+	}
+	if info.ProviderCode == nil || *info.ProviderCode != "SlowDown" {
+		t.Errorf("provider_code = %v, want SlowDown", info.ProviderCode)
+	}
+
+	info = classifyError(fmt.Errorf("wrap: %w", &fakeSmithyError{code: "InternalError"}))
+	if info.Code != CodeNetwork || !info.Retryable {
+		t.Errorf("InternalError classified = %+v", info)
+	}
+}
+
+// TestClassifyProviderInvalidCredentials provider 判定凭证无效（键不存在、
+// 签名不匹配、token 过期）映射为 E_INVALID_CREDENTIALS。
+func TestClassifyProviderInvalidCredentials(t *testing.T) {
+	for _, code := range []string{"InvalidAccessKeyId", "SignatureDoesNotMatch", "ExpiredToken", "ExpiredTokenException"} {
+		info := classifyError(s3.WrapError(&fakeSmithyError{code: code}))
+		if info.Code != CodeInvalidCredentials {
+			t.Errorf("%s code = %q, want %q", code, info.Code, CodeInvalidCredentials)
+		}
+		if info.ProviderCode == nil || *info.ProviderCode != code {
+			t.Errorf("%s provider_code = %v, want %q", code, info.ProviderCode, code)
+		}
+	}
+}
+
+// TestExecuteArgsS3StatusClassifications 真实 HTTP 语义下的稳定错误码
+// 映射：限流 → E_THROTTLED、5xx → E_NETWORK、403 → E_ACCESS_DENIED、
+// 401/凭证码 → E_INVALID_CREDENTIALS、404 → E_OBJECT_NOT_FOUND。
+func TestExecuteArgsS3StatusClassifications(t *testing.T) {
+	tests := []struct {
+		name    string
+		status  int
+		xmlCode string
+		want    string
+		retry   bool
+	}{
+		{"限流", http.StatusServiceUnavailable, "SlowDown", CodeThrottled, true},
+		{"服务端故障", http.StatusInternalServerError, "InternalError", CodeNetwork, true},
+		{"拒绝访问", http.StatusForbidden, "AccessDenied", CodeAccessDenied, false},
+		{"凭证无效", http.StatusUnauthorized, "InvalidAccessKeyId", CodeInvalidCredentials, false},
+		{"对象不存在", http.StatusNotFound, "NoSuchKey", CodeObjectNotFound, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				w.Header().Set("Content-Type", "application/xml")
+				w.WriteHeader(tt.status)
+				fmt.Fprintf(w, `<Error><Code>%s</Code><Message>raw provider text</Message></Error>`, tt.xmlCode)
+			}))
+			t.Cleanup(srv.Close)
+
+			var stdout, stderr bytes.Buffer
+			err := ExecuteArgs(context.Background(), "test", []string{
+				"itb", "s3", "list", "--format", "json", "--max-attempts", "1",
+				"--endpoint", srv.URL,
+				"--access-key", "ak",
+				"--secret-key", "sk-secret-value",
+				"--bucket", "test-bucket",
+				"--force-path-style",
+			}, &stdout, &stderr)
+			if !errors.Is(err, ErrReported) {
+				t.Fatalf("err = %v, want ErrReported", err)
+			}
+
+			var decoded MachineError
+			if err := json.Unmarshal(stdout.Bytes(), &decoded); err != nil {
+				t.Fatalf("decode stdout: %v\n%s", err, stdout.String())
+			}
+			if decoded.Error.Code != tt.want {
+				t.Errorf("code = %q, want %q", decoded.Error.Code, tt.want)
+			}
+			if decoded.Error.Retryable != tt.retry {
+				t.Errorf("retryable = %v, want %v", decoded.Error.Retryable, tt.retry)
+			}
+			if decoded.Error.ProviderCode == nil || *decoded.Error.ProviderCode != tt.xmlCode {
+				t.Errorf("provider_code = %v, want %q", decoded.Error.ProviderCode, tt.xmlCode)
+			}
+			if strings.Contains(stdout.String(), "raw provider text") || strings.Contains(stdout.String(), "sk-secret-value") {
+				t.Errorf("machine error must stay sanitized:\n%s", stdout.String())
+			}
+		})
+	}
 }
 
 type fakeSmithyError struct{ code string }

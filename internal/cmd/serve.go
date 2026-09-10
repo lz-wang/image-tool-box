@@ -66,11 +66,11 @@ func runServe(ctx context.Context, cmd *cli.Command) error {
 	addr := cmd.String("addr")
 	noAuth := cmd.Bool("no-auth")
 	if noAuth && !isLoopbackAddress(addr) {
-		return fmt.Errorf("--no-auth 只能用于 loopback 地址")
+		return invalidArgument("--no-auth 只能用于 loopback 地址")
 	}
 	token := os.Getenv("ITB_API_TOKEN")
 	if !noAuth && token == "" {
-		return fmt.Errorf("ITB_API_TOKEN is required unless --no-auth is set")
+		return invalidArgument("ITB_API_TOKEN is required unless --no-auth is set")
 	}
 	maxUpload, err := parseByteSize(cmd.String("max-upload"))
 	if err != nil {

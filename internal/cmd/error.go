@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"io/fs"
 	"net"
@@ -73,6 +74,27 @@ func (e *OperationError) Error() string {
 }
 
 func (e *OperationError) Unwrap() error { return e.Err }
+
+// InvalidArgumentError 标记 Action 内识别出的参数错误（operand 数量
+// 不符、flag 组合冲突等）。没有这个类型，这类错误会被 classifyError
+// 兜底为 E_INTERNAL——参数错误必须是 E_INVALID_ARGUMENT。
+type InvalidArgumentError struct {
+	Err error
+}
+
+func (e *InvalidArgumentError) Error() string {
+	if e.Err == nil {
+		return ""
+	}
+	return e.Err.Error()
+}
+
+func (e *InvalidArgumentError) Unwrap() error { return e.Err }
+
+// invalidArgument 构造 Action 内参数错误；消息面向用户，可安全透出。
+func invalidArgument(format string, args ...any) error {
+	return &InvalidArgumentError{Err: fmt.Errorf(format, args...)}
+}
 
 // operationError 包装 Action 错误；err 为 nil 时返回 nil。
 func operationError(operation string, err error) error {
@@ -201,6 +223,7 @@ var s3SentinelMapping = []struct {
 }{
 	{s3.ErrMissingEndpoint, CodeInvalidConfig, "S3 endpoint is not configured", false},
 	{s3.ErrMissingCredentials, CodeInvalidCredentials, "S3 credentials are missing or incomplete", false},
+	{s3.ErrInvalidCredentials, CodeInvalidCredentials, "credentials were rejected by the provider", false},
 	{s3.ErrMissingBucket, CodeInvalidConfig, "S3 bucket is not configured", false},
 	{s3.ErrMissingKey, CodeInvalidArgument, "object key is required", false},
 	{s3.ErrMissingInput, CodeInvalidArgument, "input file path is required", false},
@@ -249,6 +272,14 @@ func classifyError(err error) MachineErrorInfo {
 		return info
 	}
 
+	// Action 内的 typed 参数错误：operand 数量、flag 组合冲突等
+	var iae *InvalidArgumentError
+	if errors.As(err, &iae) {
+		info.Code = CodeInvalidArgument
+		info.Message = err.Error()
+		return info
+	}
+
 	for _, m := range s3SentinelMapping {
 		if errors.Is(err, m.sentinel) {
 			info.Code = m.code
@@ -275,6 +306,11 @@ func classifyError(err error) MachineErrorInfo {
 		info.Code = CodeNetwork
 		info.Message = "S3 provider returned an error"
 		info.Retryable = detail.Retryable
+		if detail.Throttled {
+			// 限流/过载是独立于一般网络错误的类别（脚本据此决定
+			// 指数退避而非立即重试）
+			info.Code = CodeThrottled
+		}
 		return applyDetail(info, detail)
 	}
 
@@ -321,7 +357,8 @@ func isFlagParseErrorText(message string) bool {
 	return false
 }
 
-// applyProviderDetail 附上 provider 摘要字段；限流错误升级为可重试。
+// applyProviderDetail 附上 provider 摘要字段；限流错误升级为
+// E_THROTTLED 且可重试。
 func applyProviderDetail(err error, info MachineErrorInfo) MachineErrorInfo {
 	detail, found := s3.DetailFromError(err)
 	if !found {
@@ -329,9 +366,9 @@ func applyProviderDetail(err error, info MachineErrorInfo) MachineErrorInfo {
 	}
 	if detail.Retryable {
 		info.Retryable = true
-		if info.Code == CodeNetwork {
-			info.Code = CodeThrottled
-		}
+	}
+	if detail.Throttled && info.Code == CodeNetwork {
+		info.Code = CodeThrottled
 	}
 	return applyDetail(info, detail)
 }

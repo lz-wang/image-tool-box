@@ -90,7 +90,7 @@ func resolveCompareMetrics(cmd *cli.Command) (compare.Metrics, error) {
 		metrics |= compare.MetricMSSSIM
 	}
 	if metrics == 0 {
-		return 0, fmt.Errorf("至少需要选择一个比较指标")
+		return 0, invalidArgument("至少需要选择一个比较指标")
 	}
 	return metrics, nil
 }

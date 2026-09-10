@@ -72,7 +72,7 @@ func runCompress(ctx context.Context, cmd *cli.Command) error {
 		return err
 	}
 	if cmd.Bool("in-place") && outputPath != "" {
-		return fmt.Errorf("--in-place 不能与 <dst> 同时使用")
+		return invalidArgument("--in-place 不能与 <dst> 同时使用")
 	}
 	tmpPath := ""
 	if cmd.Bool("in-place") {

@@ -17,6 +17,12 @@ var (
 	// ErrMissingCredentials 凭证未配置
 	ErrMissingCredentials = errors.New("access key and secret key are required (set via flags or ITB_S3_ACCESS_KEY_ID/ITB_S3_SECRET_ACCESS_KEY env vars)")
 
+	// ErrInvalidCredentials 凭证已提供但被 provider 判定无效
+	//（InvalidAccessKeyId / SignatureDoesNotMatch / ExpiredToken 等）。
+	// 与"本地未配置凭证"（ErrMissingCredentials）是不同的失败类别：
+	// 前者需要更换凭证，后者需要补齐配置。
+	ErrInvalidCredentials = errors.New("credentials were rejected by the provider")
+
 	// ErrMissingBucket 存储桶未指定
 	ErrMissingBucket = errors.New("bucket name is required")
 
@@ -70,12 +76,27 @@ var (
 	ErrUnsupportedCapability = errors.New("provider does not support the requested capability")
 )
 
+// credentialProviderCodes 是 provider 判定"凭证无效"的错误码并集：
+// 键不存在、签名不匹配、token 过期/失效。
+var credentialProviderCodes = map[string]bool{
+	"InvalidAccessKeyId":         true,
+	"SignatureDoesNotMatch":      true,
+	"ExpiredToken":               true,
+	"ExpiredTokenException":      true,
+	"InvalidToken":               true,
+	"UnrecognizedClientException": true,
+}
+
 // WrapError 包装 S3 API 错误，提供更友好的错误信息。
 //
 // 除 typed error 外还解析 Smithy 的 HTTP 响应错误：
 // HeadObject 在对象不存在时不一定携带 NoSuchKey typed error，
 // 只返回 404 状态码（无 s3:ListBucket 权限时甚至返回 403），
 // 因此 404 统一映射为 ErrObjectNotFound，403 保留为权限错误。
+//
+// 所有分支都用双 %w 把原始 provider 错误保留在 unwrap 链中：
+// 错误分类层需要从链中提取 HTTP 状态码与 provider code，只保留
+// 文本（%s）会让 provider_code 丢失。
 func WrapError(err error) error {
 	if err == nil {
 		return nil
@@ -84,19 +105,26 @@ func WrapError(err error) error {
 	// 处理 NoSuchKey 错误
 	var noSuchKey *types.NoSuchKey
 	if errors.As(err, &noSuchKey) {
-		return fmt.Errorf("%w: %s", ErrObjectNotFound, err)
+		return fmt.Errorf("%w: %w", ErrObjectNotFound, err)
 	}
 
 	// 处理 NoSuchBucket 错误
 	var noSuchBucket *types.NoSuchBucket
 	if errors.As(err, &noSuchBucket) {
-		return fmt.Errorf("%w: %s", ErrBucketNotFound, err)
+		return fmt.Errorf("%w: %w", ErrBucketNotFound, err)
+	}
+
+	// 处理 provider 判定凭证无效：与 AccessDenied（权限不足）是
+	// 不同的失败类别，消费方需要分别处理
+	var apiErr smithy.APIError
+	if errors.As(err, &apiErr) && credentialProviderCodes[apiErr.ErrorCode()] {
+		return fmt.Errorf("%w: %w", ErrInvalidCredentials, err)
 	}
 
 	// 处理 AccessDenied 错误
 	var accessDenied *types.AccessDenied
 	if errors.As(err, &accessDenied) {
-		return fmt.Errorf("%w: check your credentials and permissions", ErrAccessDenied)
+		return fmt.Errorf("%w: check your credentials and permissions: %w", ErrAccessDenied, err)
 	}
 
 	// 按 HTTP 状态码兜底识别（HeadObject 的 404/403 不带上述 typed error）
@@ -104,9 +132,11 @@ func WrapError(err error) error {
 	if errors.As(err, &responseErr) {
 		switch responseErr.HTTPStatusCode() {
 		case http.StatusNotFound:
-			return fmt.Errorf("%w: %s", ErrObjectNotFound, err)
+			return fmt.Errorf("%w: %w", ErrObjectNotFound, err)
+		case http.StatusUnauthorized:
+			return fmt.Errorf("%w: %w", ErrInvalidCredentials, err)
 		case http.StatusForbidden:
-			return fmt.Errorf("%w: %s", ErrAccessDenied, err)
+			return fmt.Errorf("%w: %w", ErrAccessDenied, err)
 		}
 	}
 

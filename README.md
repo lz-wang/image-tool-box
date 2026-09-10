@@ -588,18 +588,18 @@ stderr 不再重复打印同一错误（非 JSON 模式行为不变：错误文�
 
 | 错误码 | 含义 |
 |--------|------|
-| `E_INVALID_ARGUMENT` | 参数非法（含参数解析错误） |
+| `E_INVALID_ARGUMENT` | 参数非法（参数解析错误、operand 数量与 flag 组合冲突） |
 | `E_INVALID_CONFIG` | 连接配置不完整（endpoint/bucket 等） |
 | `E_FILE_NOT_FOUND` | 本地文件不存在 |
 | `E_FILE_READ` | 本地文件读取失败（权限等） |
 | `E_SOURCE_CHANGED` | 读取期间源文件发生可观察变化 |
 | `E_OBJECT_NOT_FOUND` | 对象不存在 |
 | `E_BUCKET_NOT_FOUND` | 存储桶不存在 |
-| `E_ACCESS_DENIED` | 访问被拒绝（凭证或权限） |
-| `E_INVALID_CREDENTIALS` | 凭证缺失或不完整 |
+| `E_ACCESS_DENIED` | 访问被拒绝（权限不足） |
+| `E_INVALID_CREDENTIALS` | 凭证缺失、不完整或被 provider 判定无效（InvalidAccessKeyId/SignatureDoesNotMatch/ExpiredToken） |
 | `E_TIMEOUT` | 操作或网络超时 |
 | `E_NETWORK` | 网络通信失败 |
-| `E_THROTTLED` | 服务端限流 |
+| `E_THROTTLED` | 服务端限流/过载（SlowDown、Throttling 等错误码） |
 | `E_CHECKSUM_MISMATCH` | 下载内容与期望 SHA-256 不一致 |
 | `E_TARGET_CONFLICT` | 目标对象已存在且与期望状态不一致 |
 | `E_UNSUPPORTED_CAPABILITY` | provider 不支持所需能力 |

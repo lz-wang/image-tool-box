@@ -18,26 +18,36 @@ type ErrorDetail struct {
 	HTTPStatus   *int
 	ProviderCode *string
 	Retryable    bool
+
+	// Throttled 表示 provider 明确报告限流/过载（而非一般可重试
+	// 错误）。调用方以此区分 E_THROTTLED 与 E_NETWORK。
+	Throttled bool
 }
 
-// throttledProviderCodes 是常见限流/过载 provider 错误码的并集
-//（AWS S3 与主流 S3 兼容实现）。命中即标记 retryable。
+// throttledProviderCodes 是明确的限流/过载 provider 错误码（AWS S3
+// 与主流 S3 兼容实现）。命中即标记 Throttled。
 var throttledProviderCodes = map[string]bool{
-	"ThrottlingException":                 true,
-	"Throttling":                          true,
-	"ThrottledException":                  true,
-	"SlowDown":                            true,
-	"RequestTimeout":                      true,
-	"RequestTimeoutException":             true,
+	"ThrottlingException":                    true,
+	"Throttling":                             true,
+	"ThrottledException":                     true,
+	"SlowDown":                               true,
 	"ProvisionedThroughputExceededException": true,
-	"BandwidthLimitExceeded":              true,
-	"RequestLimitExceeded":                true,
-	"RequestThrottled":                    true,
-	"RequestThrottledException":           true,
-	"TransactionInProgressException":      true,
-	"InternalError":                       true,
-	"InternalServerException":             true,
-	"ServiceUnavailable":                  true,
+	"BandwidthLimitExceeded":                 true,
+	"RequestLimitExceeded":                   true,
+	"RequestThrottled":                       true,
+	"RequestThrottledException":              true,
+}
+
+// retryableProviderCodes 是限流之外仍值得重试的 provider 错误码：
+// 请求超时、进行中事务冲突与服务端临时故障。命中只标记 Retryable，
+// 不标记 Throttled。
+var retryableProviderCodes = map[string]bool{
+	"RequestTimeout":                 true,
+	"RequestTimeoutException":        true,
+	"TransactionInProgressException": true,
+	"InternalError":                  true,
+	"InternalServerException":        true,
+	"ServiceUnavailable":             true,
 }
 
 // DetailFromError 提取错误的 provider 摘要；found 为 false 表示错误
@@ -81,15 +91,19 @@ func DetailFromError(err error) (detail ErrorDetail, found bool) {
 	}
 
 	if found {
+		if detail.ProviderCode != nil && throttledProviderCodes[*detail.ProviderCode] {
+			detail.Throttled = true
+		}
 		detail.Retryable = providerErrorRetryable(err, detail)
 	}
 	return detail, found
 }
 
 // providerErrorRetryable 判断 provider 错误是否值得重试：
-// 限流错误码、HTTP 5xx、底层网络超时。
+// 限流与其他可重试错误码、HTTP 5xx、底层网络超时。
 func providerErrorRetryable(err error, detail ErrorDetail) bool {
-	if detail.ProviderCode != nil && throttledProviderCodes[*detail.ProviderCode] {
+	if detail.ProviderCode != nil &&
+		(throttledProviderCodes[*detail.ProviderCode] || retryableProviderCodes[*detail.ProviderCode]) {
 		return true
 	}
 	if detail.HTTPStatus != nil && *detail.HTTPStatus >= http.StatusInternalServerError {

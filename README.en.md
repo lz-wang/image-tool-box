@@ -600,18 +600,18 @@ Stable error code list:
 
 | Code | Meaning |
 |--------|------|
-| `E_INVALID_ARGUMENT` | Invalid arguments (including flag parse errors) |
+| `E_INVALID_ARGUMENT` | Invalid arguments (flag parse errors, operand count and flag combination conflicts) |
 | `E_INVALID_CONFIG` | Incomplete connection configuration (endpoint/bucket, etc.) |
 | `E_FILE_NOT_FOUND` | Local file does not exist |
 | `E_FILE_READ` | Local file read failure (permissions, etc.) |
 | `E_SOURCE_CHANGED` | Source file observably changed while being read |
 | `E_OBJECT_NOT_FOUND` | Object does not exist |
 | `E_BUCKET_NOT_FOUND` | Bucket does not exist |
-| `E_ACCESS_DENIED` | Access denied (credentials or permissions) |
-| `E_INVALID_CREDENTIALS` | Credentials missing or incomplete |
+| `E_ACCESS_DENIED` | Access denied (insufficient permissions) |
+| `E_INVALID_CREDENTIALS` | Credentials missing, incomplete, or rejected by the provider (InvalidAccessKeyId/SignatureDoesNotMatch/ExpiredToken) |
 | `E_TIMEOUT` | Operation or network timeout |
 | `E_NETWORK` | Network communication failure |
-| `E_THROTTLED` | Server-side throttling |
+| `E_THROTTLED` | Server-side throttling/overload (SlowDown, Throttling, etc.) |
 | `E_CHECKSUM_MISMATCH` | Downloaded content does not match the expected SHA-256 |
 | `E_TARGET_CONFLICT` | Target object exists and differs from the expected state |
 | `E_UNSUPPORTED_CAPABILITY` | Provider does not support the required capability |

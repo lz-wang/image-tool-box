@@ -29,6 +29,11 @@ All notable changes to this project will be documented in this file.
 - **Commit 10** `s3 upload --if-exists verify` 不可覆盖条件上传：真条件写 `IfNoneMatch="*"`（绝不 HEAD+判断+PUT 模拟）；412 后 HEAD 按完整状态匹配决定 reused/`E_TARGET_CONFLICT`；409 `ConditionalRequestConflict` 加入 SDK retryer 可重试；provider 不支持时以 `E_UNSUPPORTED_CAPABILITY` 失败，绝不降级。
 - **Commit 11** E2E 收口：MinIO 集成覆盖分页（3 对象 + page-size 2 强制两页）、skip-matching、条件上传、期望值校验与本地复用；编译后二进制 E2E 锁定 inspect 内容识别契约（七种格式 + 伪装/损坏样本）、错误契约 stdout/stderr 单文档语义与 compress 失败不留 partial。
 
+### Fixed
+
+- **收尾 1** `fix(ci)`：MinIO 集成/CLI E2E 移至 Codecov 上传之前执行，`fail_ci_if_error` 降为 false——coverage 服务故障或受保护分支缺 token 不再阻断功能验证与构建矩阵。
+- **收尾 2** `fix(cli)` 补完 `itb.error.v1` 分类 taxonomy：Action 内参数错误（operand 数量、flag 组合冲突）引入 typed `InvalidArgumentError`，不再误报 `E_INTERNAL`；provider 限流错误码（SlowDown/Throttling 等）稳定映射 `E_THROTTLED`（`ErrorDetail` 新增 Throttled 标记，5xx 保持 `E_NETWORK` 可重试）；`InvalidAccessKeyId`/`SignatureDoesNotMatch`/`ExpiredToken` 及 HTTP 401 映射为 `E_INVALID_CREDENTIALS`（与"凭证未配置"、403 `E_ACCESS_DENIED` 区分）；`WrapError` 全分支以双 `%w` 保留原始 provider 错误链，保证 `provider_code`/`http_status` 可提取。
+
 ## [v0.9.3] - 2026-09-03
 
 ### Changed
