@@ -48,6 +48,7 @@ main.go ──→ internal/cmd（CLI）──→ 各领域包 (compress/resize/c
 - `internal/imageio`：跨领域共享的格式归一化（`NormalizeFormat`/`FormatFromPath`）、保存（`Save`/`SaveWithFormat`）、编码（`Encode`，含 JPEG/PNG/WEBP）、透明图铺底（`Flatten`）、十六进制颜色解析（`ParseHexColor`）。新增格式编解码应集中在这里。
 - `internal/s3`：存储后端，通过 `cmd/s3.go` 暴露为子命令。`ITB_S3_*` 环境变量由 CLI 层（urfave/cli 的 `Sources`）解析注入，优先级为 CLI flag > 环境变量 > 默认值；`internal/s3` 是纯领域包，自身不读取环境变量。注意：存储后端仅暴露为 CLI 子命令，HTTP API 不提供任何存储相关 API。
 - `internal/filehash`：跨命令共享的文件哈希 utility（单遍流式多算法摘要 + 读取后可观察变化检测 `VerifyUnchanged`）。inspect/selective hashing、compress 报告与 S3 上传快照共用；不提供 CLI 命令。
+- `internal/stablefile`：内部"稳定源快照"原语（复制到私有临时文件 + 单遍 SHA-256 + `VerifyUnchanged`）。compress 与 S3 upload 共用，保证报告摘要与实际处理内容严格对应（消除 hash 后源被替换的 TOCTOU）；不提供 CLI 命令，不扩大功能边界。
 - `internal/httpapi`：`itb serve` 的标准库 HTTP API（`/api/v1`），直接调用领域包而非 CLI 子进程。
 - `watermark.AddFile` 是文件级水印领域入口。渲染 helper 必须保持包私有，CLI/HTTP adapter 不得绕过该入口。
 

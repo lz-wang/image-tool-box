@@ -11,6 +11,8 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
+
+	"imagetoolbox/internal/stablefile"
 )
 
 // MetadataSHA256Key 上传时写入对象用户 metadata 的内容 SHA-256 键名。
@@ -214,12 +216,13 @@ func Upload(ctx context.Context, client *Client, inputPath string, key string, o
 	}
 
 	// 稳定快照：复制到私有临时文件并单遍计算 SHA-256，随后检测源文件
-	// 可观察变化。失败路径全部由 snapshotSource 清理快照。
-	snapshotPath, sha256Value, err := snapshotSource(inputPath, file, fileInfo)
+	// 可观察变化。失败路径全部由 stablefile 清理快照。
+	snapshot, err := stablefile.Snapshot(inputPath, file, fileInfo)
 	if err != nil {
 		return nil, err
 	}
-	defer os.Remove(snapshotPath)
+	defer snapshot.Close()
+	snapshotPath, sha256Value := snapshot.Path(), snapshot.SHA256()
 
 	if opts != nil && opts.SkipUnchanged && isUnchanged(remote, sha256Value) {
 		// 命中即远端 itb-sha256 与本地一致，Size 与 SHA256 都是确切值

@@ -9,6 +9,7 @@ import (
 
 	"imagetoolbox/internal/filehash"
 	"imagetoolbox/internal/imageio"
+	"imagetoolbox/internal/stablefile"
 )
 
 const DefaultQuality = 80
@@ -98,6 +99,12 @@ func NewReport(inputPath, outputPath string, r Result) CompressReport {
 // CompressFile 检测输入图片格式（PNG/JPEG），执行对应的压缩管道并写入 outputPath。
 // 供 CLI 与 Web API 共用。inputPath 与 outputPath 不得指向同一文件。
 //
+// 输入基于一份稳定快照处理（internal/stablefile）：源文件先复制到
+// 私有临时快照并单遍计算 SHA-256，格式检测与压缩管道全部读取快照；
+// 报告中的 input hash/size 由此与实际压缩内容严格对应（源文件在
+// 快照期间发生可观察变化时直接失败）。报告中的 input path 仍是用户
+// 原始路径。
+//
 // 输出采用安全提交流程：压缩结果先写入目标目录下的 .itb-compress-*
 // 临时文件，成功并校验（可关闭、非空、格式正确）后原子 rename 到
 // outputPath；任何失败都会删除临时文件——已存在的目标保持原状，
@@ -117,27 +124,41 @@ func CompressFile(ctx context.Context, inputPath, outputPath string, opts FileOp
 		return Result{}, fmt.Errorf("必须指定输出文件路径")
 	}
 
-	stat, err := os.Stat(inputPath)
-	if err != nil {
+	if stat, err := os.Stat(inputPath); err != nil {
 		return Result{}, fmt.Errorf("无法读取输入文件信息: %w", err)
+	} else if !stat.Mode().IsRegular() {
+		// FIFO 会在 open 阶段阻塞，目录读不出内容：输入必须是普通文件
+		return Result{}, fmt.Errorf("输入必须是普通文件: %s", inputPath)
 	}
 	if err := imageio.RejectSameFile(inputPath, outputPath); err != nil {
 		return Result{}, err
 	}
 
-	// 输入摘要单遍完成，并附带可观察变化检测：hash 期间输入被修改时
-	// 直接失败，避免对不可信输入执行压缩
-	inputHash, err := filehash.SumFile(inputPath, []filehash.Algorithm{filehash.SHA256})
-	if err != nil {
-		return Result{}, fmt.Errorf("无法计算输入文件摘要: %w", err)
-	}
-
-	f, err := os.Open(inputPath)
+	file, err := os.Open(inputPath)
 	if err != nil {
 		return Result{}, fmt.Errorf("无法打开输入文件: %w", err)
 	}
-	format, err := DetectFormat(f)
-	f.Close()
+	defer file.Close()
+	initial, err := file.Stat()
+	if err != nil {
+		return Result{}, fmt.Errorf("无法读取输入文件信息: %w", err)
+	}
+
+	// 稳定快照：复制 + SHA-256 单遍完成，随后检测可观察变化。
+	// 之后的格式检测与压缩全部基于快照，报告摘要与实际压缩内容
+	// 严格一致；失败路径由 stablefile 清理快照。
+	snapshot, err := stablefile.Snapshot(inputPath, file, initial)
+	if err != nil {
+		return Result{}, err
+	}
+	defer snapshot.Close()
+
+	header, err := snapshot.Open()
+	if err != nil {
+		return Result{}, fmt.Errorf("无法打开输入快照: %w", err)
+	}
+	format, err := DetectFormat(header)
+	header.Close()
 	if err != nil {
 		return Result{}, fmt.Errorf("无法检测图片格式: %w", err)
 	}
@@ -149,9 +170,9 @@ func CompressFile(ctx context.Context, inputPath, outputPath string, opts FileOp
 	outStat, err := commitOutput(outputPath, format, func(tmp *os.File) error {
 		switch format {
 		case "png":
-			return compressPNGTo(ctx, inputPath, tmp, opts.Quality)
+			return compressPNGTo(ctx, snapshot.Path(), tmp, opts.Quality)
 		case "jpeg":
-			return compressJPEGTo(ctx, inputPath, tmp, opts.Quality)
+			return compressJPEGTo(ctx, snapshot.Path(), tmp, opts.Quality)
 		default:
 			return fmt.Errorf("%w: %s", ErrUnsupportedFormat, format)
 		}
@@ -173,9 +194,9 @@ func CompressFile(ctx context.Context, inputPath, outputPath string, opts FileOp
 
 	return Result{
 		Format:       format,
-		InputSize:    stat.Size(),
+		InputSize:    snapshot.Size(),
 		OutputSize:   outStat.Size(),
-		InputSHA256:  inputHash.Digests[filehash.SHA256],
+		InputSHA256:  snapshot.SHA256(),
 		OutputSHA256: outputHash.Digests[filehash.SHA256],
 		Quality:      opts.Quality,
 		Processor:    processor,

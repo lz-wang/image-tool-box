@@ -7,10 +7,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
-
-	"imagetoolbox/internal/filehash"
 )
 
 // newUploadBodyCaptureServer 在 newUploadTestServer 基础上记录 PUT body
@@ -55,11 +52,12 @@ func newUploadBodyCaptureServer(t *testing.T) (*requestRecorder, *[]byte, *Clien
 	return rec, &body, client
 }
 
-// leftoverSnapshots 统计 os.TempDir 下当前存在的上传快照路径。
+// leftoverSnapshots 统计 os.TempDir 下当前存在的上传快照路径
+//（快照由 internal/stablefile 创建，前缀 itb-source-snapshot-*）。
 func leftoverSnapshots(t *testing.T) map[string]bool {
 	t.Helper()
 
-	matches, err := filepath.Glob(filepath.Join(os.TempDir(), "itb-upload-snapshot-*"))
+	matches, err := filepath.Glob(filepath.Join(os.TempDir(), "itb-source-snapshot-*"))
 	if err != nil {
 		t.Fatalf("glob: %v", err)
 	}
@@ -132,74 +130,6 @@ func TestUploadCleansUpSnapshot(t *testing.T) {
 	assertNoNewSnapshots(t, before)
 }
 
-// TestSnapshotSourceDetectsChangedSource 快照期间源文件发生可观察变化
-// 时报 ErrSourceChanged 并清理快照。
-func TestSnapshotSourceDetectsChangedSource(t *testing.T) {
-	before := leftoverSnapshots(t)
-	path := filepath.Join(t.TempDir(), "source.txt")
-	if err := os.WriteFile(path, []byte("original"), 0o644); err != nil {
-		t.Fatalf("write: %v", err)
-	}
-
-	file, err := os.Open(path)
-	if err != nil {
-		t.Fatalf("open: %v", err)
-	}
-	defer file.Close()
-	initial, err := file.Stat()
-	if err != nil {
-		t.Fatalf("stat: %v", err)
-	}
-
-	// "复制期间"内容被替换（size/modtime 变化）
-	if err := os.WriteFile(path, []byte("replaced with different content"), 0o644); err != nil {
-		t.Fatalf("rewrite: %v", err)
-	}
-
-	snapshot, digest, err := snapshotSource(path, file, initial)
-	if err == nil || !strings.Contains(err.Error(), filehash.ErrSourceChanged.Error()) {
-		t.Fatalf("err = %v, want source-changed failure", err)
-	}
-	if snapshot != "" || digest != "" {
-		t.Errorf("failed snapshot must return nothing, got %q / %q", snapshot, digest)
-	}
-	assertNoNewSnapshots(t, before)
-}
-
-// TestSnapshotSourceStableContent 稳定源：快照内容与摘要一一对应。
-func TestSnapshotSourceStableContent(t *testing.T) {
-	path := writeUploadFixture(t)
-
-	file, err := os.Open(path)
-	if err != nil {
-		t.Fatalf("open: %v", err)
-	}
-	defer file.Close()
-	initial, err := file.Stat()
-	if err != nil {
-		t.Fatalf("stat: %v", err)
-	}
-
-	snapshot, digest, err := snapshotSource(path, file, initial)
-	if err != nil {
-		t.Fatalf("snapshotSource: %v", err)
-	}
-	defer os.Remove(snapshot)
-	if digest != helloSHA256 {
-		t.Errorf("digest = %q, want %q", digest, helloSHA256)
-	}
-	got, err := os.ReadFile(snapshot)
-	if err != nil {
-		t.Fatalf("read snapshot: %v", err)
-	}
-	if string(got) != helloContent {
-		t.Errorf("snapshot content = %q, want %q", got, helloContent)
-	}
-	info, err := os.Stat(snapshot)
-	if err != nil {
-		t.Fatalf("stat snapshot: %v", err)
-	}
-	if info.Mode().Perm() != 0o600 {
-		t.Errorf("snapshot mode = %v, want 0600", info.Mode().Perm())
-	}
-}
+// TestSnapshotSourceDetectsChangedSource / TestSnapshotSourceStableContent
+// 的快照语义单元测试已随实现迁移到 internal/stablefile；本文件保留
+// upload 级别的 body↔sha256 一致性与清理契约测试。
