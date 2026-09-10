@@ -94,6 +94,33 @@ type UploadOptions struct {
 	IfExists IfExistsBehavior
 }
 
+// Normalize 归一化选项：未设置的 IfExists 补默认 replace。
+func (o *UploadOptions) Normalize() {
+	if o.IfExists == "" {
+		o.IfExists = IfExistsReplace
+	}
+}
+
+// Validate 校验选项。domain 是参数规则的唯一事实来源：skip 策略互斥
+// 与 if-exists 枚举必须在此拒绝；CLI validator 只是快速 UX 前置。
+func (o *UploadOptions) Validate() error {
+	strategies := 0
+	for _, enabled := range []bool{o.SkipExisting, o.SkipUnchanged, o.SkipMatching} {
+		if enabled {
+			strategies++
+		}
+	}
+	if strategies > 1 {
+		return ErrSkipStrategyConflict
+	}
+	switch o.IfExists {
+	case "", IfExistsReplace, IfExistsVerify:
+	default:
+		return fmt.Errorf("%w: %q (supported: replace, verify)", ErrInvalidIfExists, o.IfExists)
+	}
+	return nil
+}
+
 // UploadResult 上传结果
 type UploadResult struct {
 	// SchemaVersion 机器可读契约版本（itb.s3.upload.v2）
@@ -156,22 +183,13 @@ func Upload(ctx context.Context, client *Client, inputPath string, key string, o
 	if key == "" {
 		return nil, ErrMissingKey
 	}
-	if opts != nil {
-		strategies := 0
-		for _, enabled := range []bool{opts.SkipExisting, opts.SkipUnchanged, opts.SkipMatching} {
-			if enabled {
-				strategies++
-			}
-		}
-		if strategies > 1 {
-			return nil, ErrSkipStrategyConflict
-		}
-	}
-
-	// 用户 metadata 在任何网络请求之前完成归一化校验，
-	// 非法参数不产生副作用。
+	// 选项校验与 metadata 归一化在任何网络请求与文件 IO 之前完成：
+	// 非法参数不产生副作用
 	var metadata map[string]string
 	if opts != nil {
+		if err := opts.Validate(); err != nil {
+			return nil, err
+		}
 		normalized, err := NormalizeMetadata(opts.Metadata)
 		if err != nil {
 			return nil, err
@@ -256,17 +274,12 @@ func Upload(ctx context.Context, client *Client, inputPath string, key string, o
 	// 原始文件名扩展名兜底，防止 HTML/XML 错误页借 .jpg 扩展名以
 	// image/jpeg 上传。
 	var explicitContentType string
-	var ifExists IfExistsBehavior
+	ifExists := IfExistsReplace
 	if opts != nil {
 		explicitContentType = opts.ContentType
-		ifExists = opts.IfExists
-	}
-	switch ifExists {
-	case "", IfExistsReplace:
-		ifExists = IfExistsReplace
-	case IfExistsVerify:
-	default:
-		return nil, fmt.Errorf("%w: %q (supported: replace, verify)", ErrInvalidIfExists, ifExists)
+		if opts.IfExists == IfExistsVerify {
+			ifExists = IfExistsVerify
+		}
 	}
 	contentType := ResolveContentType(header[:headerSize], filepath.Base(inputPath), explicitContentType)
 

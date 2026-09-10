@@ -83,6 +83,36 @@ type DownloadOptions struct {
 	Progress io.Writer
 }
 
+// Normalize 归一化选项：未设置的 IfExists 补默认 replace。
+func (o *DownloadOptions) Normalize() {
+	if o.IfExists == "" {
+		o.IfExists = IfExistsReplace
+	}
+}
+
+// Validate 校验选项。domain 是参数规则的唯一事实来源：digest 格式、
+// expect-size 非负与 if-exists 枚举必须在此拒绝，任何网络请求之前
+// 生效；CLI validator 只是快速 UX 前置。
+func (o *DownloadOptions) Validate() error {
+	if o.VerifySHA256 != "" {
+		// 严格要求 64 个十六进制字符（32 字节）："0000" 这类短串
+		// 不是 SHA-256 digest，必须在参数阶段拒绝，否则只能等下载
+		// 完成后误报 checksum mismatch。
+		if digest, err := hex.DecodeString(o.VerifySHA256); err != nil || len(digest) != sha256.Size {
+			return fmt.Errorf("%w: --verify-sha256 must be 64 hex characters, got %q", ErrInvalidSHA256, o.VerifySHA256)
+		}
+	}
+	if o.ExpectSize != nil && *o.ExpectSize < 0 {
+		return fmt.Errorf("%w: expect-size must not be negative, got %d", ErrInvalidOptions, *o.ExpectSize)
+	}
+	switch o.IfExists {
+	case "", IfExistsReplace, IfExistsVerify:
+	default:
+		return fmt.Errorf("%w: %q (supported: replace, verify)", ErrInvalidIfExists, o.IfExists)
+	}
+	return nil
+}
+
 // DownloadResult 下载结果
 type DownloadResult struct {
 	// SchemaVersion 机器可读契约版本（itb.s3.download.v2）
@@ -160,22 +190,9 @@ func Download(ctx context.Context, client *Client, key string, outputPath string
 	if opts != nil {
 		options = *opts
 	}
-
-	if options.VerifySHA256 != "" {
-		// 严格要求 64 个十六进制字符（32 字节）："0000" 这类短串
-		// 不是 SHA-256 digest，必须在参数阶段拒绝，否则只能等下载
-		// 完成后误报 checksum mismatch。
-		if digest, err := hex.DecodeString(options.VerifySHA256); err != nil || len(digest) != sha256.Size {
-			return nil, fmt.Errorf("%w: --verify-sha256 must be 64 hex characters, got %q", ErrInvalidSHA256, options.VerifySHA256)
-		}
-	}
-
-	switch options.IfExists {
-	case "", IfExistsReplace:
-		options.IfExists = IfExistsReplace
-	case IfExistsVerify:
-	default:
-		return nil, fmt.Errorf("%w: %q (supported: replace, verify)", ErrInvalidIfExists, options.IfExists)
+	options.Normalize()
+	if err := options.Validate(); err != nil {
+		return nil, err
 	}
 
 	// --if-exists=verify 快速路径：本地副本可证明一致时跳过 GET

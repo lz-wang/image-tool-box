@@ -1,9 +1,11 @@
 package filehash
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
+	"syscall"
 	"testing"
 	"time"
 )
@@ -141,6 +143,39 @@ func TestSumFileSelective(t *testing.T) {
 func TestSumFileMissing(t *testing.T) {
 	if _, err := SumFile(filepath.Join(t.TempDir(), "nope.bin"), nil); err == nil {
 		t.Fatal("expected error for missing file")
+	}
+}
+
+// TestSumFileRejectsNonRegularFile 目录与 FIFO 不是普通文件，必须在
+// 任何读取（乃至 open 阻塞）之前拒绝。
+func TestSumFileRejectsNonRegularFile(t *testing.T) {
+	dir := t.TempDir()
+
+	if _, err := SumFile(dir, nil); err == nil || !errors.Is(err, ErrNotRegularFile) {
+		t.Fatalf("directory err = %v, want ErrNotRegularFile", err)
+	}
+
+	fifoPath := filepath.Join(dir, "pipe.fifo")
+	if err := syscall.Mkfifo(fifoPath, 0o644); err != nil {
+		t.Skipf("mkfifo unavailable: %v", err)
+	}
+	// SumFile 内部以带超时的 goroutine 探测不现实（Open 会阻塞）：
+	// 预检必须让调用直接失败而非挂起。用 goroutine + 超时兜底防挂。
+	type result struct {
+		err error
+	}
+	done := make(chan result, 1)
+	go func() {
+		_, err := SumFile(fifoPath, []Algorithm{SHA256})
+		done <- result{err}
+	}()
+	select {
+	case r := <-done:
+		if !errors.Is(r.err, ErrNotRegularFile) {
+			t.Fatalf("fifo err = %v, want ErrNotRegularFile", r.err)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("SumFile blocked on FIFO: non-regular pre-check missing")
 	}
 }
 

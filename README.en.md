@@ -409,7 +409,10 @@ from the extension. PNG / JPEG / GIF / WebP / BMP / TIFF / SVG are recognized:
 BMP and TIFF are fully raster-decodable (via `golang.org/x/image`); SVG is
 recognized as an image (`recognized=true`) but is **never raster-decoded**
 (`decode_supported=false`) — that is a capability boundary, not corruption, and
-SVG files without explicit width/height are valid.
+SVG files without explicit width/height are valid. After recognition SVG gets a
+**full XML structure validation** (parse to EOF, single root, no dangling
+content): truncated or malformed SVG reports `error.structure_invalid` by
+default and fails under `--strict`.
 
 ```bash
 # Default table output; computes all hashes; prints detailed data
@@ -485,9 +488,11 @@ recognition object:
 | `extension_matches` | Whether the file extension matches the recognized format (aliases like `.jpeg`/`.tif` also match) |
 
 Detection runs in three stages: **content recognition → structure validation
-(`image.DecodeConfig`, skipped for SVG) → optional full decode**. Unrecognized
-content keeps the v2 behavior (`error.decode_config_failed`, error under
-`--strict`); recognized-but-structurally-broken files keep the same conclusion.
+(`image.DecodeConfig`; SVG uses full XML structure validation instead) →
+optional full decode**. Unrecognized content keeps the v2 behavior
+(`error.decode_config_failed`, error under `--strict`); content recognized as
+SVG whose document is structurally broken reports `error.structure_invalid`
+(error under `--strict`).
 By default (header decoding) only the image header is read, which cannot detect
 files whose header is fine but whose tail is corrupted; `--full-decode` fully
 decodes the file and adds:

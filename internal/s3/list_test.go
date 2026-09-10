@@ -3,6 +3,7 @@ package s3
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -218,16 +219,35 @@ func TestListPageSizeControlsMaxKeys(t *testing.T) {
 		}
 	})
 
-	t.Run("invalid page-size falls back to protocol default 1000", func(t *testing.T) {
+	t.Run("page-size 0 归一化为协议默认 1000", func(t *testing.T) {
 		_, client := newListTestServer(t, 0, "obj-%06d", nil)
-		for _, size := range []int32{0, -1, 1001, 5000} {
-			result, err := List(context.Background(), client, &ListOptions{PageSize: size})
-			if err != nil {
-				t.Fatalf("List(page-size %d): %v", size, err)
+		result, err := List(context.Background(), client, &ListOptions{PageSize: 0})
+		if err != nil {
+			t.Fatalf("List(page-size 0): %v", err)
+		}
+		if result.Pages != 1 {
+			t.Fatalf("pages = %d, want 1", result.Pages)
+		}
+	})
+
+	// domain 是参数规则的唯一事实来源：超范围 page-size 必须报
+	// ErrInvalidOptions，绝不静默收敛为 1000（否则 domain 直调与
+	// CLI adapter 走出不同契约）
+	t.Run("invalid page-size is rejected", func(t *testing.T) {
+		_, client := newListTestServer(t, 0, "obj-%06d", nil)
+		for _, size := range []int32{-1, 1001, 5000} {
+			_, err := List(context.Background(), client, &ListOptions{PageSize: size})
+			if err == nil || !errors.Is(err, ErrInvalidOptions) {
+				t.Fatalf("List(page-size %d) err = %v, want ErrInvalidOptions", size, err)
 			}
-			if result.Pages != 1 {
-				t.Fatalf("page-size %d: pages = %d", size, result.Pages)
-			}
+		}
+	})
+
+	t.Run("negative limit is rejected", func(t *testing.T) {
+		_, client := newListTestServer(t, 0, "obj-%06d", nil)
+		_, err := List(context.Background(), client, &ListOptions{Limit: -5})
+		if err == nil || !errors.Is(err, ErrInvalidOptions) {
+			t.Fatalf("err = %v, want ErrInvalidOptions", err)
 		}
 	})
 }

@@ -232,6 +232,9 @@ Flags:
   `--no-hash`. Hashing is a single streaming pass with post-read change
   detection (`E_SOURCE_CHANGED` if the file observably changed mid-read).
 - `--strict`: return an error instead of an `error` object when parsing fails.
+  Recognized-as-SVG files additionally get a full XML structure validation
+  (parse to EOF, single root, no dangling content); a truncated or malformed
+  SVG reports `error.structure_invalid` (or fails under `--strict`).
 - `--full-decode`: fully decode the image (frame-by-frame for GIF). Detects
   files whose header is fine but tail is corrupted; adds `full_decode_ok`
   (tri-state), `frame_count` (GIF), `animation_known`, and `animated`.
@@ -342,10 +345,14 @@ MIME` are checked against response headers before the target is created and
 against actual bytes afterwards (`E_TARGET_CONFLICT` on mismatch; 0-byte
 objects are valid, so an unset size is distinct from `--expect-size 0`).
 `--if-exists verify` reuses a local copy only when its size/SHA-256 provably
-matches a provided basis (`status=reused`, 0 × GET) — with no basis it fails
-immediately; "the file exists" is never sufficient. Any failure — including
-checksum mismatch — leaves no partial file at the output path (temp file +
-rename). The `itb.s3.download.v2` JSON adds `status` and `content_type`.
+matches a provided basis (`status=reused`) — with no basis it fails
+immediately; "the file exists" is never sufficient. Reuse never weakens
+verification: `--verify` and `--expect-content-type` are enforced on the reuse
+path too (one HEAD against the remote object); only `--verify-sha256` (plus
+optional `--expect-size`) reuses with zero network access. Any failure —
+including checksum mismatch — leaves no partial file at the output path
+(temp file + rename). The `itb.s3.download.v2` JSON adds `status` and
+`content_type`.
 
 `s3 upload --if-exists verify` performs a true immutable conditional upload
 (`IfNoneMatch="*"`): it writes only when the key is absent; if the key exists,

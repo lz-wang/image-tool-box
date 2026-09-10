@@ -56,9 +56,22 @@ func File(path string, opts Options) (*Result, error) {
 	result.Content = recognizeContent(header, path)
 
 	// 阶段 2：结构/配置校验。已识别为不支持 raster 解码的格式（SVG）
-	// 跳过 DecodeConfig，这不是损坏；未识别内容仍尝试 DecodeConfig，
-	// 其失败保留 v2 的 error 结论。
-	if !(result.Content.Recognized && !result.Content.DecodeSupported) {
+	// 跳过 DecodeConfig，改以 XML 结构校验代替——识别成功但文档损坏
+	//（如截断的 <svg><g>）必须显式暴露，strict 模式直接失败；未识别
+	// 内容仍尝试 DecodeConfig，其失败保留 v2 的 error 结论。
+	if result.Content.Recognized && !result.Content.DecodeSupported {
+		if result.Content.Format == "svg" {
+			if err := validateSVG(path); err != nil {
+				if opts.Strict {
+					return nil, fmt.Errorf("SVG 结构校验失败: %w", err)
+				}
+				result.Error = &InfoError{
+					Code:    "structure_invalid",
+					Message: err.Error(),
+				}
+			}
+		}
+	} else {
 		imgInfo, decodeErr := decodeImageConfig(path)
 		if decodeErr != nil {
 			if opts.Strict {
@@ -110,12 +123,19 @@ func File(path string, opts Options) (*Result, error) {
 		detail := &DetailInfo{
 			MagicBytes:  firstHex(header, 10),
 			HeaderBytes: firstHex(header, 32),
-			DetectedBy:  "image.DecodeConfig",
 		}
 
-		if result.Image != nil {
-			detail.ExtensionMatchesFormat = result.Content.ExtensionMatches
+		// DetectedBy 报告真实检测来源：magic 嗅探、SVG 流式解析，
+		// 或兜底的 image.DecodeConfig（内容未识别但 DecodeConfig 成功）
+		switch {
+		case result.Content.Recognized && result.Content.Format == "svg":
+			detail.DetectedBy = "svg.parse"
+		case result.Content.Recognized:
+			detail.DetectedBy = "magic"
+		case result.Image != nil:
+			detail.DetectedBy = "image.DecodeConfig"
 		}
+		detail.ExtensionMatchesFormat = result.Content.Recognized && result.Content.ExtensionMatches
 
 		result.Detail = detail
 	}

@@ -32,7 +32,8 @@ type ListOptions struct {
 	Delimiter string
 
 	// PageSize 是单次 ListObjectsV2 请求的 MaxKeys（1..1000）。
-	// 非法值（<=0 或 >1000）按协议默认 1000 处理。
+	// 0 表示使用协议默认（Normalize 归一化为 maxPageSize）；
+	// 负值或超过 1000 由 Validate 拒绝，绝不静默收敛。
 	PageSize int32
 
 	// Limit 是输出对象总数上限；0 表示不限制。启用 Limit 后达到上限
@@ -47,6 +48,26 @@ type ListOptions struct {
 
 	// All 为 true 时持续翻页直到遍历结束；false（默认）只请求一页。
 	All bool
+}
+
+// Normalize 归一化选项：未设置（0）的 PageSize 补协议默认。
+func (o *ListOptions) Normalize() {
+	if o.PageSize == 0 {
+		o.PageSize = maxPageSize
+	}
+}
+
+// Validate 校验选项。domain 是参数规则的唯一事实来源：超出协议范围
+// 的 PageSize 与负数 Limit 是参数错误，绝不静默收敛——CLI validator
+// 只是快速 UX 前置，不能是唯一防线。
+func (o *ListOptions) Validate() error {
+	if o.PageSize < 0 || o.PageSize > maxPageSize {
+		return fmt.Errorf("%w: page-size must be in 1..%d, got %d", ErrInvalidOptions, maxPageSize, o.PageSize)
+	}
+	if o.Limit < 0 {
+		return fmt.Errorf("%w: limit must not be negative, got %d", ErrInvalidOptions, o.Limit)
+	}
+	return nil
 }
 
 // ListResult 一次 list 操作的完整结果。
@@ -98,10 +119,11 @@ func List(ctx context.Context, client *Client, opts *ListOptions) (*ListResult, 
 	if opts != nil {
 		options = *opts
 	}
-	pageSize := int32(maxPageSize)
-	if options.PageSize > 0 && options.PageSize <= maxPageSize {
-		pageSize = options.PageSize
+	options.Normalize()
+	if err := options.Validate(); err != nil {
+		return nil, err
 	}
+	pageSize := options.PageSize
 
 	result := &ListResult{
 		SchemaVersion: ListSchemaVersion,

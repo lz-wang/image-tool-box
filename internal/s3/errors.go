@@ -23,6 +23,14 @@ var (
 	// 前者需要更换凭证，后者需要补齐配置。
 	ErrInvalidCredentials = errors.New("credentials were rejected by the provider")
 
+	// ErrInvalidConfig 连接配置非法（网络行为参数为负等）。
+	ErrInvalidConfig = errors.New("invalid S3 config")
+
+	// ErrInvalidOptions 操作选项非法（page-size 超出协议范围、负数
+	// limit/expect-size 等）。参数校验由 domain Normalize/Validate
+	// 统一承担，CLI validator 只是快速 UX 前置。
+	ErrInvalidOptions = errors.New("invalid options")
+
 	// ErrMissingBucket 存储桶未指定
 	ErrMissingBucket = errors.New("bucket name is required")
 

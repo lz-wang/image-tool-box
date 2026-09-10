@@ -1,6 +1,8 @@
 package inspect
 
 import (
+	"image"
+	"image/png"
 	"os"
 	"path/filepath"
 	"testing"
@@ -116,4 +118,101 @@ func TestInspectSVGFile(t *testing.T) {
 			t.Fatalf("html content must not be recognized as svg: %+v", result.Content)
 		}
 	})
+}
+
+// TestInspectBrokenSVGStructure 内容识别成功但文档结构损坏（截断、
+// 非法嵌套、根元素后追加内容）必须显式暴露：默认输出 error 对象，
+// --strict 直接失败。
+func TestInspectBrokenSVGStructure(t *testing.T) {
+	tests := []struct {
+		name    string
+		content string
+	}{
+		{"根元素未闭合", `<svg><g>`},
+		{"标签未闭合", `<svg><broken`},
+		{"根元素后追加内容", `<svg/><oops/>`},
+		{"根元素后追加文本", `<svg/>trailing`},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			path := writeTextFile(t, "broken.svg", tt.content)
+
+			result, err := File(path, Options{NoHash: true})
+			if err != nil {
+				t.Fatalf("File: %v", err)
+			}
+			// 内容识别仍成立（recognition 与结构校验分离）
+			if !result.Content.Recognized || result.Content.Format != "svg" {
+				t.Fatalf("content = %+v, want recognized svg", result.Content)
+			}
+			if result.Error == nil || result.Error.Code != "structure_invalid" {
+				t.Fatalf("error = %+v, want structure_invalid", result.Error)
+			}
+
+			if _, err := File(path, Options{NoHash: true, Strict: true}); err == nil {
+				t.Error("strict mode must fail for broken svg")
+			}
+		})
+	}
+}
+
+// TestInspectValidSVGHasNoStructureError 完整合法 SVG（自闭合、嵌套
+// 完整、根后空白）不产生结构错误。
+func TestInspectValidSVGHasNoStructureError(t *testing.T) {
+	tests := []struct {
+		name    string
+		content string
+	}{
+		{"自闭合", `<svg/>`},
+		{"嵌套完整", `<svg><g><rect/></g></svg>`},
+		{"根后空白", "<svg/>\n"},
+		{"声明+注释+根", `<?xml version="1.0"?><!-- x --><svg xmlns="http://www.w3.org/2000/svg"/>`},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			path := writeTextFile(t, "ok.svg", tt.content)
+			result, err := File(path, Options{NoHash: true})
+			if err != nil {
+				t.Fatalf("File: %v", err)
+			}
+			if !result.Content.Recognized {
+				t.Fatalf("content = %+v, want recognized", result.Content)
+			}
+			if result.Error != nil {
+				t.Errorf("error = %+v, want none", result.Error)
+			}
+		})
+	}
+}
+
+// TestValidateSVGDetectsByDetail --detail 的 detected_by 反映真实
+// 检测来源：SVG 为 svg.parse，magic 格式为 magic，兜底为
+// image.DecodeConfig。
+func TestValidateSVGDetectsByDetail(t *testing.T) {
+	svgPath := writeTextFile(t, "vector.svg", `<svg><rect/></svg>`)
+	result, err := File(svgPath, Options{NoHash: true, Detail: true})
+	if err != nil {
+		t.Fatalf("File: %v", err)
+	}
+	if result.Detail == nil || result.Detail.DetectedBy != "svg.parse" {
+		t.Fatalf("detail = %+v, want svg.parse", result.Detail)
+	}
+
+	pngPath := filepath.Join(t.TempDir(), "img.png")
+	img := image.NewNRGBA(image.Rect(0, 0, 4, 4))
+	f, err := os.Create(pngPath)
+	if err != nil {
+		t.Fatalf("create: %v", err)
+	}
+	defer f.Close()
+	if err := png.Encode(f, img); err != nil {
+		t.Fatalf("encode: %v", err)
+	}
+	result, err = File(pngPath, Options{NoHash: true, Detail: true})
+	if err != nil {
+		t.Fatalf("File: %v", err)
+	}
+	if result.Detail == nil || result.Detail.DetectedBy != "magic" {
+		t.Fatalf("detail = %+v, want magic", result.Detail)
+	}
 }

@@ -34,6 +34,10 @@ const (
 // 能检测保留 size 与 modtime 的恶意并发修改。
 var ErrSourceChanged = errors.New("source file changed while being read")
 
+// ErrNotRegularFile 输入路径不是普通文件（目录、FIFO、设备等）。
+// FIFO 必须在 open 之前拒绝——open 一个没有写端的 FIFO 会无限阻塞。
+var ErrNotRegularFile = errors.New("source is not a regular file")
+
 // AllAlgorithms 是未做选择性指定时的默认算法集合（历史行为：全部计算）。
 func AllAlgorithms() []Algorithm {
 	return []Algorithm{SHA256, SHA1, MD5, CRC32}
@@ -116,15 +120,22 @@ func Sum(r io.Reader, algorithms []Algorithm) (Result, error) {
 // SumFile 计算文件内容的多算法摘要，并保证结果对应一次完整、未被
 // 可观察打断的读取：
 //
-//  1. 打开文件，保存初始 FileInfo；
-//  2. 流式哈希（单次读取）；
-//  3. 再次读取同一 FD 的 Stat 与原路径的 Stat；
-//  4. 以 os.SameFile + size/modtime 检测可观察变化。
+//  1. 预检路径必须指向普通文件（FIFO 在 open 阶段就会阻塞，必须
+//     先用 Stat 拒绝；目录/FIFO/设备一律 ErrNotRegularFile）；
+//  2. 打开文件，保存初始 FileInfo（再查一次 mode，双保险）；
+//  3. 流式哈希（单次读取）；
+//  4. 再次读取同一 FD 的 Stat 与原路径的 Stat；
+//  5. 以 os.SameFile + size/modtime 检测可观察变化。
 //
 // 检测到变化（内容被就地修改、路径被 rename 替换或文件被删除）时返回
 // ErrSourceChanged，摘要不可信。注意：无法检测保留 size 与 modtime 的
 // 恶意并发修改。
 func SumFile(path string, algorithms []Algorithm) (Result, error) {
+	// open 之前先拒绝非普通文件：os.Open 一个 FIFO 会阻塞到有写端出现
+	if info, err := os.Stat(path); err == nil && !info.Mode().IsRegular() {
+		return Result{}, fmt.Errorf("%w: %s", ErrNotRegularFile, path)
+	}
+
 	file, err := os.Open(path)
 	if err != nil {
 		return Result{}, err
@@ -134,6 +145,9 @@ func SumFile(path string, algorithms []Algorithm) (Result, error) {
 	initial, err := file.Stat()
 	if err != nil {
 		return Result{}, fmt.Errorf("failed to stat input file: %w", err)
+	}
+	if !initial.Mode().IsRegular() {
+		return Result{}, fmt.Errorf("%w: %s", ErrNotRegularFile, path)
 	}
 
 	result, err := Sum(file, algorithms)

@@ -405,7 +405,9 @@ MS-SSIM: 0.987423
 XML 解析），从不依赖扩展名。支持识别 PNG / JPEG / GIF / WebP / BMP / TIFF / SVG：
 其中 BMP、TIFF 可完整光栅解码（基于 `golang.org/x/image`）；SVG 会被识别为图片
 （`recognized=true`）但**不做光栅解码**（`decode_supported=false`）——这是能力边界
-而非文件损坏，没有显式 width/height 的 SVG 同样合法。
+而非文件损坏，没有显式 width/height 的 SVG 同样合法。SVG 识别后会做**完整 XML
+结构校验**（解析到 EOF、单一根、无悬挂内容）：截断或结构损坏的 SVG 默认输出
+`error.structure_invalid`，`--strict` 直接失败。
 
 ```bash
 # 默认表格输出，默认计算所有 hash，默认输出详细数据
@@ -476,11 +478,12 @@ JSON 契约版本为 `itb.inspect.v3`。v3 新增 `content` 内容识别对象�
 | `full_decode_supported` | 是否支持 `--full-decode`；SVG 为 `false`（对其使用该 flag 记录 warning） |
 | `extension_matches` | 文件扩展名是否与识别出的格式一致（`.jpeg`/`.tif` 等 alias 也算匹配） |
 
-检测流程分三个阶段：**内容识别 → 结构校验（`image.DecodeConfig`，SVG 跳过）→
-可选完整解码**。未识别内容保留 v2 行为（`error.decode_config_failed`，`--strict`
-报错）；已识别但结构损坏的文件同样保留该结论。默认（header 解码）只读取图片头，
-无法发现"文件头正常但后半部分损坏"的文件；`--full-decode` 对文件做完整解码并补充
-以下字段：
+检测流程分三个阶段：**内容识别 → 结构校验（`image.DecodeConfig`，SVG 以 XML
+结构校验代替）→ 可选完整解码**。未识别内容保留 v2 行为
+（`error.decode_config_failed`，`--strict` 报错）；已识别为 SVG 但文档结构损坏
+的文件输出 `error.structure_invalid`（`--strict` 报错）。默认（header 解码）只
+读取图片头，无法发现"文件头正常但后半部分损坏"的文件；`--full-decode` 对文件做
+完整解码并补充以下字段：
 
 | 字段 | 说明 |
 |------|------|
