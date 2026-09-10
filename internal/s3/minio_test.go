@@ -256,15 +256,6 @@ func TestMinIOIntegration(t *testing.T) {
 		}
 	})
 
-	t.Run("delete removes object", func(t *testing.T) {
-		if err := Delete(ctx, client, basicKey, nil); err != nil {
-			t.Fatalf("Delete: %v", err)
-		}
-		if _, err := Stat(ctx, client, basicKey); err == nil || !strings.Contains(err.Error(), ErrObjectNotFound.Error()) {
-			t.Fatalf("expected not found after delete, got %v", err)
-		}
-	})
-
 	// ---- Commit 11 收口：分页 / skip-matching / 条件上传 / 期望值 ----
 
 	t.Run("list pagination across pages", func(t *testing.T) {
@@ -356,9 +347,17 @@ func TestMinIOIntegration(t *testing.T) {
 	})
 
 	t.Run("download expect-size and content-type", func(t *testing.T) {
+		// 自带对象：basicKey 经 overwrite 后内容已变，子测试不得依赖
+		// 其历史状态
+		key := prefix + "expect.txt"
+		path := uploadFixture("expect.txt", helloContent)
+		if _, err := Upload(ctx, client, path, key, nil); err != nil {
+			t.Fatalf("seed upload: %v", err)
+		}
+
 		output := filepath.Join(t.TempDir(), "expected.txt")
 		good := int64(len(helloContent))
-		if _, err := Download(ctx, client, basicKey, output, &DownloadOptions{
+		if _, err := Download(ctx, client, key, output, &DownloadOptions{
 			ExpectSize:        &good,
 			ExpectContentType: "text/plain",
 		}); err != nil {
@@ -366,7 +365,7 @@ func TestMinIOIntegration(t *testing.T) {
 		}
 
 		wrong := good + 1
-		if _, err := Download(ctx, client, basicKey, filepath.Join(t.TempDir(), "bad.txt"), &DownloadOptions{
+		if _, err := Download(ctx, client, key, filepath.Join(t.TempDir(), "bad.txt"), &DownloadOptions{
 			ExpectSize: &wrong,
 		}); err == nil || !strings.Contains(err.Error(), ErrExpectationMismatch.Error()) {
 			t.Fatalf("err = %v, want expectation mismatch", err)
@@ -374,12 +373,18 @@ func TestMinIOIntegration(t *testing.T) {
 	})
 
 	t.Run("download reuses verified local copy", func(t *testing.T) {
+		key := prefix + "reuse.txt"
+		path := uploadFixture("reuse.txt", helloContent)
+		if _, err := Upload(ctx, client, path, key, nil); err != nil {
+			t.Fatalf("seed upload: %v", err)
+		}
+
 		output := filepath.Join(t.TempDir(), "local.txt")
 		if err := os.WriteFile(output, []byte(helloContent), 0o644); err != nil {
 			t.Fatalf("seed local copy: %v", err)
 		}
 
-		result, err := Download(ctx, client, basicKey, output, &DownloadOptions{
+		result, err := Download(ctx, client, key, output, &DownloadOptions{
 			VerifySHA256: helloSHA256,
 			IfExists:     IfExistsVerify,
 		})
@@ -395,11 +400,23 @@ func TestMinIOIntegration(t *testing.T) {
 		if err := os.WriteFile(divergent, []byte("divergent"), 0o644); err != nil {
 			t.Fatalf("seed divergent copy: %v", err)
 		}
-		if _, err := Download(ctx, client, basicKey, divergent, &DownloadOptions{
+		if _, err := Download(ctx, client, key, divergent, &DownloadOptions{
 			VerifySHA256: helloSHA256,
 			IfExists:     IfExistsVerify,
 		}); err == nil || !strings.Contains(err.Error(), ErrExpectationMismatch.Error()) {
 			t.Fatalf("err = %v, want expectation mismatch", err)
+		}
+	})
+
+	// 破坏性操作放在最后：basicKey 被此前的 download 子测试依赖，
+	// 过早删除会让后续子测试误报"对象不存在"（该顺序问题曾被
+	// Codecov 阻断的 CI 掩盖）
+	t.Run("delete removes object", func(t *testing.T) {
+		if err := Delete(ctx, client, basicKey, nil); err != nil {
+			t.Fatalf("Delete: %v", err)
+		}
+		if _, err := Stat(ctx, client, basicKey); err == nil || !strings.Contains(err.Error(), ErrObjectNotFound.Error()) {
+			t.Fatalf("expected not found after delete, got %v", err)
 		}
 	})
 }
