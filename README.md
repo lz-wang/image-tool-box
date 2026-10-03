@@ -16,6 +16,8 @@
 
 ## Linux 兼容性
 
+CI 的 S3 验收通过 `scripts/start-ci-minio.sh` 从固定 MinIO release 源码构建临时测试服务；官方镜像不可用时仍执行真实集成测试与 CLI E2E，不依赖第三方镜像替代品。
+
 官方 Linux amd64 / arm64 构建的 `compress` 和条码解码原生工具要求 **glibc >= 2.28**；Go 实现的其他功能不在启动时强制检查此条件。Alpine Linux / musl 当前不受支持。
 
 | 系统 | `compress` 支持情况 |

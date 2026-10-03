@@ -16,6 +16,8 @@
 
 ## Linux compatibility
 
+CI S3 acceptance uses `scripts/start-ci-minio.sh` to build a temporary test service from a fixed MinIO release source. Real integration and CLI E2E tests continue when official images are unavailable, without a third-party image replacement.
+
 The native tools for `compress` and barcode decoding in official Linux amd64 / arm64 builds require **glibc >= 2.28**. Other Go-implemented features are not rejected at startup when this requirement is absent. Alpine Linux / musl is not currently supported.
 
 | System | `compress` support |

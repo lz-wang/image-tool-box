@@ -38,28 +38,9 @@ jobs:
         with:
           go-version-file: go.mod
 
-      # 不用 service container：GitHub Actions 的 services 不支持容器命令
-      # （args 是非法键，会使整个 workflow 在解析阶段失败且不创建任何
-      # job；options 又只能传 docker create 的 flags），而 minio/minio
-      # 镜像的默认 CMD 只有 "minio"，必须显式传 server /data 才能启动。
-      # 在 step 内 docker run 并等待健康检查，启动失败时本 step 直接红。
+      # 官方镜像已不可拉取；保持同一个 release，从固定源码构建测试服务。
       - name: Start MinIO
-        run: |
-          set -euo pipefail
-          docker run -d --name minio -p 9000:9000 \
-            -e MINIO_ROOT_USER=minioadmin \
-            -e MINIO_ROOT_PASSWORD=minioadmin \
-            minio/minio:RELEASE.2024-06-13T22-53-53Z server /data
-          for i in $(seq 1 30); do
-            if curl -sf http://127.0.0.1:9000/minio/health/live >/dev/null; then
-              echo "MinIO is ready (probe $i)"
-              exit 0
-            fi
-            sleep 2
-          done
-          echo "::error::MinIO failed to become healthy"
-          docker logs minio
-          exit 1
+        run: bash scripts/start-ci-minio.sh
 
       - name: Run unit checks
         run: |
@@ -86,6 +67,14 @@ jobs:
           flags: backend
           name: backend
           fail_ci_if_error: false
+
+      - name: Stop MinIO
+        if: always()
+        run: |
+          if [[ -f "$RUNNER_TEMP/itb-minio/server.pid" ]]; then
+            read -r minio_pid < "$RUNNER_TEMP/itb-minio/server.pid"
+            kill "$minio_pid" || true
+          fi
 
   build:
     name: ${{ matrix.target.name }}

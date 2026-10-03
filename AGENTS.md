@@ -136,7 +136,7 @@ main.go ──→ internal/cmd（CLI）──→ 各领域包 (compress/resize/c
 - 不使用 `testdata/`，测试中用 `image.NewNRGBA` 等就地合成图片，避免二进制 fixture。
 - 根目录的 `test-images/` 仅作手动验证（已 gitignore），不要在测试里引用。
 - 纯 Go 单测不依赖内嵌的原生二进制；涉及 `compress` 的集成测试才会触发解压流程。
-- `internal/s3/minio_test.go` 包含真实 MinIO 的领域集成测试和编译后 `itb` 二进制 CLI E2E（upload/stat/download/skip/metadata/cache-control/overwrite/verify/delete + path-style，以及 list 分页、skip-matching、条件上传、期望值校验、本地复用与 stdout/stderr 单 JSON 文档契约）。CI 在 workflow step 中通过 `docker run` 启动 MinIO 并分别执行两层测试；本地默认跳过，可用 `ITB_TEST_MINIO_ENDPOINT`（默认 `http://127.0.0.1:9000`）、`ITB_TEST_MINIO_ACCESS_KEY`/`ITB_TEST_MINIO_SECRET_KEY`（默认 `minioadmin`）指向自建实例运行。
+- `internal/s3/minio_test.go` 包含真实 MinIO 的领域集成测试和编译后 `itb` 二进制 CLI E2E（upload/stat/download/skip/metadata/cache-control/overwrite/verify/delete + path-style，以及 list 分页、skip-matching、条件上传、期望值校验、本地复用与 stdout/stderr 单 JSON 文档契约）。CI 通过 `scripts/start-ci-minio.sh` 从固定 release commit 构建临时 loopback 服务，分别执行两层测试并清理；本地默认跳过，可用 `ITB_TEST_MINIO_ENDPOINT`（默认 `http://127.0.0.1:9000`）、`ITB_TEST_MINIO_ACCESS_KEY`/`ITB_TEST_MINIO_SECRET_KEY`（默认 `minioadmin`）指向自建实例运行。
 - `internal/cmd/e2e_test.go` 是不依赖 MinIO 的编译后二进制 E2E：inspect 内容识别契约（PNG/JPEG/GIF/WebP/BMP/TIFF/SVG/伪装 SVG/损坏 TIFF、`--hash sha256` 选择性哈希）、`itb.error.v1` stdout/stderr 单文档契约与 compress 失败不留 partial，随 `make test-unit` 真实执行。
 - `internal/barcode/native_test.go` 覆盖真实七码制、roundtrip、多码、旋转/反色、EXIF 与协议；`internal/cmd/barcode_e2e_test.go` 覆盖 compiled CLI。缺失 reader 时仅原生测试跳过；CI 设置 `ITB_REQUIRE_BARCODE_NATIVE=1` 与测试 writer 路径，缺失直接失败。
 

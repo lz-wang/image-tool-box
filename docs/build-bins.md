@@ -190,7 +190,7 @@ cmake --install /tmp/itb-zxing-reader --component ITBReader --prefix "$PWD/bins/
 
 amd64 将架构改为 `x86_64`，目录改为 `bins/macos-amd64`。Windows 使用 Visual Studio `-A x64` / `-A ARM64`、`--config Release` 并安装到对应 `bins/windows-*`；CMake 固定静态 MSVC runtime。平台产物为 `zxing-reader`，Windows 为 `zxing-reader.exe`。`ITBReader` 安装组件只复制 helper，避免把 ZXing 静态库或头文件放入 embed 目录。
 
-Linux 与压缩器一起通过 `scripts/build-linux-bins-container.sh` 在固定 digest 的 `manylinux_2_28` 中构建，依赖构建期 `glibc-static`。helper 完全静态链接 C++/GCC/glibc runtime；`scripts/verify-linux-abi.sh` 的原有基础动态库 allowlist 不变，禁止额外 `libstdc++`、`libgcc_s` 等运行时依赖。CI 同时校验架构与 glibc 2.28 上限。
+Linux 与压缩器一起通过 `scripts/build-linux-bins-container.sh` 在固定 digest 的 `manylinux_2_28` 中构建，依赖构建期 `glibc-static`。helper 完全静态链接 C++/GCC/glibc runtime，不引入 `libstdc++`、`libgcc_s` 动态依赖；`scripts/verify-linux-abi.sh` 的原有基础动态库 allowlist 不变。CI 同时校验架构与 glibc 2.28 上限。
 
 Go 主程序始终 `CGO_ENABLED=0`。`main.go` 将 `bins/**` 注入 `nativebin.Init`，按工具单独提取到用户缓存 `itb/bins/<platform>/<sha256>/`，复用前校验 SHA-256；首次解码才提取 reader。运行时只分发 `itb`，无需另装 ZXing 或 Python/uv。
 
