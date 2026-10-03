@@ -4,6 +4,10 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [v0.10.1] - 2026-10-03
+
+本版本收齐条码能力迁移的兼容性修复：Code128 输入限制、输出父目录、完整文字尺寸、Unix PNG `0644` 权限及六平台文件提交回归验收。JSON schema 保持不变。
+
 ### Fixed
 
 - 条码生成在提交完整 PNG 前将文件权限设为 `0644`，统一普通生成与 `--force` 替换在 Unix 上的输出权限，并增加文件权限回归测试。
