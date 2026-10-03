@@ -980,6 +980,6 @@ Size、ETag、Content-Type、Storage Class、Cache-Control、Version ID 与用�
 
 ## 许可证
 
-内部实现：`internal/nativebin` 统一管理内嵌工具的按需提取与 SHA-256 缓存；`internal/barcode` 提供纯 Go 的 QR、Code128、Code39、EAN13/EAN8 PNG 生成领域接口，CLI/HTTP 接口见后续条码说明。
+内部实现：`internal/nativebin` 统一管理内嵌工具的按需提取与 SHA-256 缓存；`internal/barcode` 提供纯 Go 的 QR、Code128、Code39、EAN13/EAN8 PNG 生成，以及通过内嵌 ZXing reader 解码上述码制和 Micro QR/rMQR 的领域接口。解码返回多码定位点；未检出码时成功返回空数组。
 
 本项目使用 MIT 许可证。内置的第三方工具请参阅 [LICENSE-THIRD-PARTY.md](./LICENSE-THIRD-PARTY.md)。
