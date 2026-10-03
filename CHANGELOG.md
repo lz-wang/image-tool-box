@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Unreleased]
+
+### Fixed
+
+- 条码生成领域层明确校验 Code128 的 1..80 ASCII 字符限制，自动创建输出父目录，并在计划尺寸与 HTTP 准入中计入完整固定字体文字及水平留白，避免长数字 Code128 文字裁剪。`itb.barcode.generate.v1` 字段与版本不变；开启文字时部分输出宽度会增加。
+
 ## [v0.10.0] - 2026-10-03
 
 本版本改进包括可靠 S3 操作、机器可读输出和条码生成/解码，稳定 JSON schema 清单如下：

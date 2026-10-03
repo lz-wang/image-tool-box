@@ -520,7 +520,7 @@ itb barcode generate code128 ABC123 label.png --module-width 2 --module-height 8
 itb barcode decode code.png --symbology qr --symbology micro-qr --symbology rmqr --format json
 ```
 
-Generation supports `qr/code128/code39/ean13/ean8`; `micro-qr/rmqr` are decode-only. Generation uses pure Go and requires a `.png` destination. Output is staged in the destination directory and committed atomically; replacing an existing file requires `--force`, and failures leave no partial output. Dimensions use integer pixels, with no DPI, millimeter or system-font dependency.
+Generation supports `qr/code128/code39/ean13/ean8`; `micro-qr/rmqr` are decode-only. Generation uses pure Go and requires a `.png` destination. Missing parent directories are created automatically. Output is staged in the destination directory and committed atomically; replacing an existing file requires `--force`, and failures leave no partial output. Dimensions use integer pixels, with no DPI, millimeter or system-font dependency.
 
 | Symbology | Generation input | Decode |
 |------|----------|------|
@@ -546,7 +546,7 @@ Generation supports `qr/code128/code39/ean13/ean8`; `micro-qr/rmqr` are decode-o
 | `--symbology` | All seven | Repeatable decode filter; generation uses an operand |
 | `--format` | `table` | CLI success output: `table/json` |
 
-QR output side length is `(matrix modules + 2 × border) × module-size`. Linear codes have a ten-module quiet zone on each horizontal side and 10 px top/bottom margins. Text is enabled by default, uses the embedded `basicfont.Face7x13`, and adds 20 px to the height. For EAN, `data` preserves caller input while `encoded_text` contains the actual code including its checksum.
+QR output side length is `(matrix modules + 2 × border) × module-size`. Linear codes are centered with at least a ten-module quiet zone on each horizontal side and 10 px top/bottom margins. Text is enabled by default, uses the embedded `basicfont.Face7x13`, and adds 20 px to the height. Output width is the larger of the barcode width (including quiet zones) and the complete text width (with 10 px margins on each side), so long text is not clipped. For EAN, `data` preserves caller input while `encoded_text` contains the actual code including its checksum.
 
 ```json
 {

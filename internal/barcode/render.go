@@ -26,14 +26,15 @@ func render(ctx context.Context, p Plan) (*image.Gray, error) {
 	for i := range img.Pix {
 		img.Pix[i] = 255
 	}
-	sx, sy, ox, oy := p.opts.ModuleWidth, p.opts.ModuleHeight, 10*p.opts.ModuleWidth, 10
+	sx, sy, ox, oy := p.opts.ModuleWidth, p.opts.ModuleHeight, 0, 10
+	bounds := p.code.Bounds()
+	ox = (p.Width - bounds.Dx()*sx) / 2
 	if p.opts.Symbology == QRCode {
 		sx = p.opts.ModuleSize
 		sy = sx
 		ox = p.opts.Border * sx
 		oy = ox
 	}
-	bounds := p.code.Bounds()
 	for y := 0; y < bounds.Dy(); y++ {
 		if err := ctx.Err(); err != nil {
 			return nil, err

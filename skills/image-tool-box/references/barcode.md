@@ -26,7 +26,7 @@ itb barcode decode code.png --symbology qr --symbology micro-qr --symbology rmqr
 | `ean13` | 12 位数字，或校验位正确的完整 13 位 | 支持 |
 | `ean8` | 7 位数字，或校验位正确的完整 8 位 | 支持 |
 
-生成格式固定为 PNG，目的路径必须以 `.png` 结尾。尺寸单位为整数像素或模块，不提供打印毫米、DPI 或系统字体行为。生成先写同目录临时文件，再原子提交；默认不覆盖，`--force` 原子替换，失败保留旧文件。
+生成格式固定为 PNG，目的路径必须以 `.png` 结尾；不存在的父目录会自动创建。尺寸单位为整数像素或模块，不提供打印毫米、DPI 或系统字体行为。生成先写同目录临时文件，再原子提交；默认不覆盖，`--force` 原子替换，失败保留旧文件。
 
 ## 参数与尺寸
 
@@ -42,7 +42,7 @@ itb barcode decode code.png --symbology qr --symbology micro-qr --symbology rmqr
 | `--symbology` | 全部七码制 | 解码过滤器，可重复；生成的码制使用位置参数 |
 | `--format` | `table` | 命令行输出 `table/json` |
 
-QR 边长为 `(矩阵模块数 + 2 × border) × module-size`。线性码左右各留十个模块静区，上下各留 10 像素；默认使用内置 `basicfont.Face7x13` 绘制文字，额外增加 20 像素高度。生成工作集上限为 512 MiB。
+QR 边长为 `(矩阵模块数 + 2 × border) × module-size`。线性码居中，左右至少各留十个模块静区，上下各留 10 像素；默认使用内置 `basicfont.Face7x13` 绘制完整文字，额外增加 20 像素高度。输出宽度取含静区的条码宽度与完整文字加左右各 10 像素留白的宽度最大值。生成工作集上限为 512 MiB。
 
 ## JSON 结果
 

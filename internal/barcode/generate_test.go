@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
+	"image"
 	"image/color"
 	"image/png"
 	"os"
@@ -11,6 +13,10 @@ import (
 	"strings"
 	"sync"
 	"testing"
+
+	"golang.org/x/image/font"
+	"golang.org/x/image/font/basicfont"
+	"golang.org/x/image/math/fixed"
 )
 
 func TestGeneratePlans(t *testing.T) {
@@ -127,6 +133,113 @@ func TestLinearTextAndDimensions(t *testing.T) {
 	}
 	if bytes.Equal(withText.Pix[withoutText.Stride*70:withoutText.Stride*80], withoutText.Pix[withoutText.Stride*70:]) {
 		t.Fatal("text was not drawn")
+	}
+}
+
+func TestCode128DataBounds(t *testing.T) {
+	for _, tc := range []struct {
+		name  string
+		data  string
+		valid bool
+	}{
+		{"empty", "", false},
+		{"one", "A", true},
+		{"eighty", strings.Repeat("A", 80), true},
+		{"eighty-one", strings.Repeat("A", 81), false},
+		{"non-ascii", "é", false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			o := DefaultGenerateOptions()
+			o.Symbology, o.Data = Code128, tc.data
+			_, err := GeneratePlan(o)
+			if tc.valid && err != nil {
+				t.Fatal(err)
+			}
+			if !tc.valid && !errors.Is(err, ErrInvalidData) {
+				t.Fatalf("expected ErrInvalidData, got %v", err)
+			}
+			if tc.name == "eighty-one" && !strings.Contains(err.Error(), "Code128 requires 1..80 ASCII characters") {
+				t.Fatalf("domain length contract missing: %v", err)
+			}
+		})
+	}
+}
+
+func TestCode128LongTextGeometry(t *testing.T) {
+	for _, data := range []string{strings.Repeat("12", 40), strings.Repeat("A", 80)} {
+		t.Run(data, func(t *testing.T) {
+			o := DefaultGenerateOptions()
+			o.Symbology, o.Data, o.ModuleWidth = Code128, data, 1
+			p, err := GeneratePlan(o)
+			if err != nil {
+				t.Fatal(err)
+			}
+			textWidth := font.MeasureString(basicfont.Face7x13, data).Ceil()
+			barWidth := p.code.Bounds().Dx()
+			wantWidth := max(barWidth+20, textWidth+20)
+			if p.Width != wantWidth {
+				t.Fatalf("width=%d, want %d for complete text and margins", p.Width, wantWidth)
+			}
+			img, err := p.Render(context.Background())
+			if err != nil {
+				t.Fatal(err)
+			}
+			if img.Bounds().Dx() != p.Width || img.Bounds().Dy() != p.Height {
+				t.Fatal("render bounds differ from admission plan")
+			}
+			// Compare every text pixel with a full, unclipped fixed-font rendering.
+			want := image.NewGray(image.Rect(0, 0, wantWidth, 20))
+			for i := range want.Pix {
+				want.Pix[i] = 255
+			}
+			d := font.Drawer{Dst: want, Src: image.Black, Face: basicfont.Face7x13, Dot: fixed.P((wantWidth-textWidth)/2, 16)}
+			d.DrawString(data)
+			textStart := (10 + o.ModuleHeight) * img.Stride
+			if !bytes.Equal(img.Pix[textStart:textStart+len(want.Pix)], want.Pix) {
+				t.Fatal("human-readable text was clipped or misplaced")
+			}
+			barStart := (wantWidth - barWidth) / 2
+			for x := 0; x < wantWidth; x++ {
+				wantPixel := color.Gray{Y: 255}
+				if x >= barStart && x < barStart+barWidth {
+					wantPixel = color.GrayModel.Convert(p.code.At(x-barStart, 0)).(color.Gray)
+				}
+				if img.GrayAt(x, 10) != wantPixel {
+					t.Fatalf("barcode is not centered at x=%d", x)
+				}
+			}
+			o.DrawText = false
+			without, err := GeneratePlan(o)
+			if err != nil || without.Width != barWidth+20 {
+				t.Fatalf("text-disabled geometry: %+v, %v", without, err)
+			}
+		})
+	}
+}
+
+func TestGenerateCreatesParentDirectories(t *testing.T) {
+	for _, force := range []bool{false, true} {
+		t.Run(fmt.Sprintf("force=%t", force), func(t *testing.T) {
+			dst := filepath.Join(t.TempDir(), "codes", "nested", "example.png")
+			o := DefaultGenerateOptions()
+			o.Data = "hello"
+			r, err := GenerateFile(context.Background(), dst, o, force)
+			if err != nil {
+				t.Fatal(err)
+			}
+			data, err := os.ReadFile(dst)
+			if err != nil {
+				t.Fatal(err)
+			}
+			img, err := png.Decode(bytes.NewReader(data))
+			if err != nil || img.Bounds().Dx() != r.Output.Width || int64(len(data)) != r.Output.SizeBytes {
+				t.Fatal("generated PNG does not match report", err)
+			}
+			entries, err := os.ReadDir(filepath.Dir(dst))
+			if err != nil || len(entries) != 1 {
+				t.Fatalf("temporary output left behind: %v, %v", entries, err)
+			}
+		})
 	}
 }
 

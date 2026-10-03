@@ -15,6 +15,8 @@ import (
 	"github.com/boombuler/barcode/code39"
 	"github.com/boombuler/barcode/ean"
 	"github.com/boombuler/barcode/qr"
+	"golang.org/x/image/font"
+	"golang.org/x/image/font/basicfont"
 )
 
 type GenerateOptions struct {
@@ -50,6 +52,9 @@ func GeneratePlan(opts GenerateOptions) (Plan, error) {
 	if s == MicroQRCode || s == RMQRCode {
 		return Plan{}, fmt.Errorf("%w: %s is decode-only", ErrInvalidSymbology, s)
 	}
+	if s == Code128 && (len(opts.Data) < 1 || len(opts.Data) > 80) {
+		return Plan{}, fmt.Errorf("%w: Code128 requires 1..80 ASCII characters", ErrInvalidData)
+	}
 	if opts.Data == "" || !utf8.ValidString(opts.Data) || len(opts.Data) > 8192 {
 		return Plan{}, fmt.Errorf("%w: content must be valid UTF-8 with 1..8192 bytes", ErrInvalidData)
 	}
@@ -71,7 +76,7 @@ func GeneratePlan(opts GenerateOptions) (Plan, error) {
 		case Code128:
 			for _, r := range opts.Data {
 				if r > 127 {
-					return Plan{}, fmt.Errorf("%w: Code128 requires ASCII", ErrInvalidData)
+					return Plan{}, fmt.Errorf("%w: Code128 requires 1..80 ASCII characters", ErrInvalidData)
 				}
 			}
 			code, err = code128.Encode(opts.Data)
@@ -106,6 +111,9 @@ func GeneratePlan(opts GenerateOptions) (Plan, error) {
 		w = (w + 20) * int64(opts.ModuleWidth)
 		h = int64(opts.ModuleHeight) + 20
 		if opts.DrawText {
+			// Fixed 10 px text margins preserve every glyph even for compact codes.
+			textWidth := int64(font.MeasureString(basicfont.Face7x13, code.Content()).Ceil())
+			w = max(w, textWidth+20)
 			h += 20
 		}
 	}
@@ -149,6 +157,13 @@ func (p Plan) WriteFile(ctx context.Context, dst string, force bool) (GenerateRe
 	if strings.ToLower(filepath.Ext(dst)) != ".png" {
 		return GenerateResult{}, fmt.Errorf("%w: output must have .png extension", ErrInvalidOptions)
 	}
+	if err := ctx.Err(); err != nil {
+		return GenerateResult{}, err
+	}
+	dir := filepath.Dir(dst)
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return GenerateResult{}, err
+	}
 	if _, err := os.Lstat(dst); err == nil && !force {
 		return GenerateResult{}, ErrTargetExists
 	} else if err != nil && !os.IsNotExist(err) {
@@ -158,7 +173,7 @@ func (p Plan) WriteFile(ctx context.Context, dst string, force bool) (GenerateRe
 	if err != nil {
 		return GenerateResult{}, err
 	}
-	f, err := os.CreateTemp(filepath.Dir(dst), ".itb-barcode-*.png")
+	f, err := os.CreateTemp(dir, ".itb-barcode-*.png")
 	if err != nil {
 		return GenerateResult{}, err
 	}

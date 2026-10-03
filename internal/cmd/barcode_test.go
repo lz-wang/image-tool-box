@@ -14,7 +14,7 @@ import (
 
 func TestBarcodeCLIContract(t *testing.T) {
 	dir := t.TempDir()
-	dst := filepath.Join(dir, "code.png")
+	dst := filepath.Join(dir, "codes", "nested", "code.png")
 	var out, stderr bytes.Buffer
 	err := ExecuteArgs(context.Background(), "test", []string{"itb", "barcode", "generate", "ean13", "690123456789", dst, "--format", "json"}, &out, &stderr)
 	if err != nil {
@@ -31,6 +31,7 @@ func TestBarcodeCLIContract(t *testing.T) {
 	}{
 		{"conflict", []string{"generate", "qr", "hello", dst}, CodeTargetConflict, "barcode.generate"},
 		{"ean", []string{"generate", "ean8", "bad", filepath.Join(dir, "bad.png")}, CodeInvalidArgument, "barcode.generate"},
+		{"code128-too-long", []string{"generate", "code128", strings.Repeat("A", 81), filepath.Join(dir, "long.png")}, CodeInvalidArgument, "barcode.generate"},
 		{"symbology", []string{"generate", "micro-qr", "hello", filepath.Join(dir, "micro.png")}, CodeInvalidArgument, "barcode.generate"},
 		{"operands", []string{"generate", "qr"}, CodeInvalidArgument, "barcode.generate"},
 		{"missing", []string{"decode", filepath.Join(dir, "missing.png")}, CodeFileNotFound, "barcode.decode"},

@@ -508,7 +508,7 @@ itb barcode generate code128 ABC123 label.png --module-width 2 --module-height 8
 itb barcode decode code.png --symbology qr --symbology micro-qr --symbology rmqr --format json
 ```
 
-生成支持 `qr/code128/code39/ean13/ean8`；`micro-qr/rmqr` 仅解码。生成使用纯 Go，目标必须为 `.png`，先写同目录临时文件再原子提交；已有文件需 `--force` 才替换，失败不留 partial。尺寸为整数像素，没有 DPI、毫米或系统字体依赖。
+生成支持 `qr/code128/code39/ean13/ean8`；`micro-qr/rmqr` 仅解码。生成使用纯 Go，目标必须为 `.png`，自动创建不存在的父目录，先写同目录临时文件再原子提交；已有文件需 `--force` 才替换，失败不留 partial。尺寸为整数像素，没有 DPI、毫米或系统字体依赖。
 
 | 码制 | 生成输入 | 解码 |
 |------|----------|------|
@@ -534,7 +534,7 @@ itb barcode decode code.png --symbology qr --symbology micro-qr --symbology rmqr
 | `--symbology` | 全部七种 | decode 筛选，可重复；generate 的码制为 operand |
 | `--format` | `table` | CLI 成功输出：`table/json` |
 
-QR 输出边长为 `(矩阵模块数 + 2 × border) × module-size`。一维码左右各留 10 个模块的 quiet zone，上下各留 10 px；文字默认开启，使用内置 `basicfont.Face7x13`，额外增加 20 px 高度。EAN 的 `data` 保留调用方输入，`encoded_text` 是包含校验位的实际编码文本。
+QR 输出边长为 `(矩阵模块数 + 2 × border) × module-size`。一维码居中，左右至少各留 10 个模块的 quiet zone，上下各留 10 px；文字默认开启，使用内置 `basicfont.Face7x13`，额外增加 20 px 高度。输出宽度取条码（含 quiet zone）与完整文字（左右各 10 px 留白）所需宽度的最大值，长文本不会裁剪。EAN 的 `data` 保留调用方输入，`encoded_text` 是包含校验位的实际编码文本。
 
 ```json
 {

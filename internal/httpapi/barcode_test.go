@@ -7,6 +7,7 @@ import (
 	"image/png"
 	"net/http/httptest"
 	"os"
+	"strings"
 	"testing"
 
 	"imagetoolbox/internal/barcode"
@@ -79,6 +80,10 @@ func TestBarcodeHTTPAdmission(t *testing.T) {
 		{"target-working", "generate", Config{MaxWorkingBytes: 100}, map[string]string{"symbology": "qr", "data": "hello"}, nil, 413},
 		{"huge-plan", "generate", Config{}, map[string]string{"symbology": "qr", "data": "hello", "module-size": "1000000"}, nil, 413},
 		{"zero-module", "generate", Config{}, map[string]string{"symbology": "qr", "data": "hello", "module-size": "0"}, nil, 400},
+		{"code128-too-long", "generate", Config{}, map[string]string{"symbology": "code128", "data": strings.Repeat("A", 81)}, nil, 400},
+		{"code128-text-admission", "generate", Config{MaxDimension: 550}, map[string]string{"symbology": "code128", "data": strings.Repeat("12", 40), "module-width": "1"}, nil, 413},
+		{"code128-text-pixels", "generate", Config{MaxPixels: 580*120 - 1}, map[string]string{"symbology": "code128", "data": strings.Repeat("12", 40), "module-width": "1"}, nil, 413},
+		{"code128-text-working", "generate", Config{MaxWorkingBytes: 580*120*2 + 1<<20 - 1}, map[string]string{"symbology": "code128", "data": strings.Repeat("12", 40), "module-width": "1"}, nil, 413},
 		{"unknown-field", "generate", Config{}, map[string]string{"symbology": "qr", "data": "hello", "force": "true"}, nil, 400},
 		{"unexpected-file", "generate", Config{}, map[string]string{"symbology": "qr", "data": "hello"}, testPNG(t, 2, 2), 400},
 		{"upload", "generate", Config{MaxUpload: 16}, map[string]string{"symbology": "qr", "data": "hello"}, nil, 413},
