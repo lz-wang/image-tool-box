@@ -3,9 +3,8 @@ package cmd
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
-
-	"imagetoolbox/internal/nativebin"
 )
 
 func TestBarcodeCLIE2E(t *testing.T) {
@@ -44,8 +43,16 @@ func TestBarcodeCLIE2E(t *testing.T) {
 }
 
 func TestBarcodeNativeCLIE2E(t *testing.T) {
-	nativebin.Init(os.DirFS("../.."))
-	if _, err := nativebin.Ensure(nativebin.ZXingReader); err != nil {
+	// The child binary initializes its own embedded tools. Do not initialize
+	// the parent's registry: that changes unrelated compress tests' state.
+	platform := runtime.GOOS + "-" + runtime.GOARCH
+	name := "zxing-reader"
+	if runtime.GOOS == "darwin" {
+		platform = "macos-" + runtime.GOARCH
+	} else if runtime.GOOS == "windows" {
+		name += ".exe"
+	}
+	if _, err := os.Stat(filepath.Join("..", "..", "bins", platform, name)); err != nil {
 		if os.Getenv("ITB_REQUIRE_BARCODE_NATIVE") == "1" {
 			t.Fatal(err)
 		}
