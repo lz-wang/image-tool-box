@@ -68,7 +68,9 @@ int main() {
         for (const auto& code : codes) {
             if (!code.isValid()) continue;
             size_t index = 0;
-            while (index < formats.size() && code.format() != formats[index]) ++index;
+            while (index < formats.size() && code.format() != formats[index] &&
+                !(index == 0 && code.format() == F::QRCode) &&
+                !(index == 4 && code.format() == F::Code39)) ++index;
             if (index == formats.size()) continue;
             if (!first) std::cout << ',';
             first = false;

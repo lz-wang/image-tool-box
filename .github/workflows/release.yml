@@ -385,6 +385,38 @@ jobs:
             }
           }
 
+      - name: Build and test native barcode contracts (Unix)
+        if: runner.os != 'Windows'
+        shell: bash
+        env:
+          ITB_REQUIRE_BARCODE_NATIVE: "1"
+          CGO_ENABLED: "0"
+        run: |
+          cmake -S native/zxing-test-writer -B "${RUNNER_TEMP}/itb-zxing-test" \
+            -DCMAKE_BUILD_TYPE=Release ${{ matrix.target.cmake_extra_args }}
+          cmake --build "${RUNNER_TEMP}/itb-zxing-test" --parallel
+          export ITB_TEST_ZXING_READER="${GITHUB_WORKSPACE}/${{ matrix.target.bins_dir }}/zxing-reader"
+          export ITB_TEST_ZXING_WRITER="${RUNNER_TEMP}/itb-zxing-test/zxing-test-writer"
+          go test ./internal/barcode ./internal/cmd ./internal/httpapi -run '^(TestNative|TestBarcode)' -v
+
+      - name: Build and test native barcode contracts (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        env:
+          ITB_REQUIRE_BARCODE_NATIVE: "1"
+          CGO_ENABLED: "0"
+        run: |
+          $buildDir = Join-Path $env:RUNNER_TEMP "itb-zxing-test"
+          $cmakeArch = if ("${{ matrix.target.goarch }}" -eq "arm64") { "ARM64" } else { "x64" }
+          cmake -S native/zxing-test-writer -B $buildDir -A $cmakeArch
+          if ($LASTEXITCODE -ne 0) { throw "Test writer configuration failed" }
+          cmake --build $buildDir --config Release --parallel
+          if ($LASTEXITCODE -ne 0) { throw "Test writer build failed" }
+          $env:ITB_TEST_ZXING_READER = Join-Path $env:GITHUB_WORKSPACE "${{ matrix.target.bins_dir }}/zxing-reader.exe"
+          $env:ITB_TEST_ZXING_WRITER = Join-Path $buildDir "Release/zxing-test-writer.exe"
+          go test ./internal/barcode ./internal/cmd ./internal/httpapi -run '^(TestNative|TestBarcode)' -v
+          if ($LASTEXITCODE -ne 0) { throw "Native barcode tests failed" }
+
       - name: Verify Linux ABI contract
         if: runner.os == 'Linux'
         shell: bash

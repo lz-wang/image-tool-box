@@ -12,6 +12,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -36,6 +37,9 @@ func buildE2EBinary(t *testing.T) string {
 		t.Fatalf("resolve repository root: %v", err)
 	}
 	binary := filepath.Join(t.TempDir(), "itb")
+	if runtime.GOOS == "windows" {
+		binary += ".exe"
+	}
 	build := exec.Command("go", "build", "-o", binary, ".")
 	build.Dir = repoRoot
 	if output, err := build.CombinedOutput(); err != nil {

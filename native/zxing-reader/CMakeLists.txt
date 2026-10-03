@@ -29,6 +29,8 @@ endif()
 add_executable(zxing-reader main.cpp)
 target_link_libraries(zxing-reader PRIVATE ZXing::ZXing)
 if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
-  target_link_options(zxing-reader PRIVATE -static-libstdc++ -static-libgcc)
+  # GCC's static C++ runtime can still add ld-linux to NEEDED on arm64.
+  # Full static linking preserves the existing shared-library allowlist.
+  target_link_options(zxing-reader PRIVATE -static -static-libstdc++ -static-libgcc)
 endif()
 install(TARGETS zxing-reader RUNTIME DESTINATION . COMPONENT ITBReader)

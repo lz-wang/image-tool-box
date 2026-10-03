@@ -3,9 +3,14 @@ package httpapi
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"image/png"
 	"net/http/httptest"
+	"os"
 	"testing"
+
+	"imagetoolbox/internal/barcode"
+	"imagetoolbox/internal/nativebin"
 )
 
 func TestBarcodeGenerateHTTP(t *testing.T) {
@@ -19,6 +24,44 @@ func TestBarcodeGenerateHTTP(t *testing.T) {
 	img, err := png.Decode(bytes.NewReader(w.Body.Bytes()))
 	if err != nil || img.Bounds().Dx() != 290 {
 		t.Fatal(err)
+	}
+}
+
+func TestBarcodeNativeHTTP(t *testing.T) {
+	if _, err := nativebin.Ensure(nativebin.ZXingReader); err != nil {
+		if os.Getenv("ITB_REQUIRE_BARCODE_NATIVE") == "1" {
+			t.Fatal(err)
+		}
+		t.Skipf("native reader unavailable: %v", err)
+	}
+	h := mustNew(t, Config{NoAuth: true})
+	w := httptest.NewRecorder()
+	h.ServeHTTP(w, newMultipartRequest(t, "POST", "/api/v1/barcode/generate", map[string]string{"symbology": "qr", "data": "http-hello"}))
+	if w.Code != 200 {
+		t.Fatal(w.Code, w.Body.String())
+	}
+	data := append([]byte(nil), w.Body.Bytes()...)
+	for _, tc := range []struct {
+		data          []byte
+		fields        map[string]string
+		count, status int
+	}{
+		{data, nil, 1, 200}, {testPNG(t, 20, 20), nil, 0, 200}, {data, map[string]string{"symbology": "ean13"}, 0, 200}, {data, map[string]string{"symbology": "aztec"}, 0, 400},
+	} {
+		w = httptest.NewRecorder()
+		h.ServeHTTP(w, newMultipartRequest(t, "POST", "/api/v1/barcode/decode", tc.fields, formFile{field: "input", filename: "client.png", content: tc.data}))
+		if w.Code != tc.status {
+			t.Fatal(w.Code, w.Body.String())
+		}
+		if tc.status == 200 {
+			var r barcode.DecodeResult
+			if err := json.Unmarshal(w.Body.Bytes(), &r); err != nil {
+				t.Fatal(err)
+			}
+			if r.SchemaVersion != "itb.barcode.decode.v1" || r.Input.Path != "client.png" || len(r.Codes) != tc.count || r.Codes == nil {
+				t.Fatal(r)
+			}
+		}
 	}
 }
 
