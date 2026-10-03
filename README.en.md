@@ -16,7 +16,7 @@
 
 ## Linux compatibility
 
-The `compress` feature in official Linux amd64 / arm64 builds requires **glibc >= 2.28**. Other Go-implemented features are not rejected at startup when this requirement is absent. Alpine Linux / musl is not currently supported.
+The native tools for `compress` and barcode decoding in official Linux amd64 / arm64 builds require **glibc >= 2.28**. Other Go-implemented features are not rejected at startup when this requirement is absent. Alpine Linux / musl is not currently supported.
 
 | System | `compress` support |
 |--------|--------------------|

@@ -26,7 +26,7 @@ var (
 )
 
 func newBinaryStates() map[ID]*binaryState {
-	return map[ID]*binaryState{PNGQuant: {}, OxiPNG: {}, DJPEG: {}, CJPEG: {}}
+	return map[ID]*binaryState{PNGQuant: {}, OxiPNG: {}, DJPEG: {}, CJPEG: {}, ZXingReader: {}}
 }
 
 // Init 初始化二进制文件（从 main.go 调用，传入 //go:embed bins/** 的 embed.FS）。

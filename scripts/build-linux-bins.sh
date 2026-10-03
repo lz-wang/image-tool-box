@@ -42,6 +42,11 @@ cmake --build "$work_dir/libjpeg-turbo/build" --target cjpeg-static djpeg-static
 install -m 0755 "$work_dir/libjpeg-turbo/build/cjpeg-static" "$output_dir/cjpeg-static"
 install -m 0755 "$work_dir/libjpeg-turbo/build/djpeg-static" "$output_dir/djpeg-static"
 
-for binary in pngquant oxipng cjpeg-static djpeg-static; do
+repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cmake -S "$repo_root/native/zxing-reader" -B "$work_dir/zxing-reader" -DCMAKE_BUILD_TYPE=Release
+cmake --build "$work_dir/zxing-reader" --parallel
+cmake --install "$work_dir/zxing-reader" --component ITBReader --prefix "$output_dir"
+
+for binary in pngquant oxipng cjpeg-static djpeg-static zxing-reader; do
     strip --strip-unneeded "$output_dir/$binary" || true
 done

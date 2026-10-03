@@ -331,6 +331,28 @@ jobs:
             Copy-Item $source (Join-Path $binsDir $fileName)
           }
 
+      - name: Build ZXing reader (macOS)
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          cmake -S native/zxing-reader -B "${RUNNER_TEMP}/itb-zxing" \
+            -DCMAKE_BUILD_TYPE=Release ${{ matrix.target.cmake_extra_args }}
+          cmake --build "${RUNNER_TEMP}/itb-zxing" --config Release --parallel
+          cmake --install "${RUNNER_TEMP}/itb-zxing" --component ITBReader --config Release --prefix "${{ matrix.target.bins_dir }}"
+
+      - name: Build ZXing reader (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $buildDir = Join-Path $env:RUNNER_TEMP "itb-zxing"
+          $cmakeArch = if ("${{ matrix.target.goarch }}" -eq "arm64") { "ARM64" } else { "x64" }
+          cmake -S native/zxing-reader -B $buildDir -A $cmakeArch
+          if ($LASTEXITCODE -ne 0) { throw "ZXing configuration failed" }
+          cmake --build $buildDir --config Release --parallel
+          if ($LASTEXITCODE -ne 0) { throw "ZXing build failed" }
+          cmake --install $buildDir --config Release --prefix "${{ matrix.target.bins_dir }}"
+          if ($LASTEXITCODE -ne 0) { throw "ZXing installation failed" }
+
       - name: Verify required bundled binaries (Unix)
         if: runner.os != 'Windows'
         shell: bash
@@ -341,6 +363,7 @@ jobs:
           test -x "${{ matrix.target.bins_dir }}/oxipng"
           test -x "${{ matrix.target.bins_dir }}/cjpeg-static"
           test -x "${{ matrix.target.bins_dir }}/djpeg-static"
+          test -x "${{ matrix.target.bins_dir }}/zxing-reader"
 
       - name: Verify required bundled binaries (Windows)
         if: runner.os == 'Windows'
@@ -351,7 +374,8 @@ jobs:
             "pngquant.exe",
             "oxipng.exe",
             "cjpeg-static.exe",
-            "djpeg-static.exe"
+            "djpeg-static.exe",
+            "zxing-reader.exe"
           )
 
           foreach ($fileName in $required) {

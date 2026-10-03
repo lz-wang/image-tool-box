@@ -26,7 +26,7 @@ docker run --rm \
     "$image" \
     bash -lc '
         set -euo pipefail
-        dnf install -y git nasm make cmake gcc gcc-c++ binutils curl pkgconf-pkg-config
+        dnf install -y git nasm make cmake gcc gcc-c++ binutils curl pkgconf-pkg-config openssl
         export RUSTUP_HOME=/tmp/rustup
         export CARGO_HOME=/tmp/cargo
         export PATH="$CARGO_HOME/bin:$PATH"

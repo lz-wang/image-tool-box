@@ -16,7 +16,7 @@
 
 ## Linux 兼容性
 
-官方 Linux amd64 / arm64 构建的 `compress` 功能要求 **glibc >= 2.28**；Go 实现的其他功能不在启动时强制检查此条件。Alpine Linux / musl 当前不受支持。
+官方 Linux amd64 / arm64 构建的 `compress` 和条码解码原生工具要求 **glibc >= 2.28**；Go 实现的其他功能不在启动时强制检查此条件。Alpine Linux / musl 当前不受支持。
 
 | 系统 | `compress` 支持情况 |
 |------|---------------------|

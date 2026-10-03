@@ -9,7 +9,7 @@ fi
 arch="$1"
 bins_dir="$2"
 baseline="2.28"
-binaries=(pngquant oxipng cjpeg-static djpeg-static)
+binaries=(pngquant oxipng cjpeg-static djpeg-static zxing-reader)
 
 case "$arch" in
     amd64) expected_machine="Advanced Micro Devices X86-64" ;;
