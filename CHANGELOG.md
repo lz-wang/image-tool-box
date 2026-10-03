@@ -2,9 +2,9 @@
 
 All notable changes to this project will be documented in this file.
 
-## [Unreleased]
+## [v0.10.0] - 2026-10-03
 
-当前未发布改进包括可靠 S3 操作、机器可读输出和条码生成/解码，稳定 JSON schema 清单如下：
+本版本改进包括可靠 S3 操作、机器可读输出和条码生成/解码，稳定 JSON schema 清单如下：
 
 | Schema | 用途 |
 |--------|------|
