@@ -4,18 +4,26 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
-本轮围绕"可靠上传/下载/列举/校验 + 机器可读输出"共 11 个独立 commit，全部稳定 JSON schema 清单如下：
+当前未发布改进包括可靠 S3 操作、机器可读输出和条码生成/解码，稳定 JSON schema 清单如下：
 
 | Schema | 用途 |
 |--------|------|
 | `itb.error.v1` | CLI 失败输出的统一机器可读错误契约（`--format json` 时失败输出到 stdout，含稳定 `E_*` 错误码） |
 | `itb.inspect.v3` | inspect JSON（新增 `content` 内容识别对象；保留 v2 的 full-decode 字段） |
 | `itb.compress.v1` | compress `--format json`（input/output 的 path/format/size/sha256、quality、processor、elapsed_ms） |
+| `itb.barcode.generate.v1` | barcode generate JSON（symbology/data/encoded_text/draw_text、QR 选项与 output） |
+| `itb.barcode.decode.v1` | barcode decode CLI/HTTP JSON（input、codes 与四点像素坐标；无码成功返回空数组） |
 | `itb.s3.list.v2` | s3 list JSON（从裸数组升级为结构化对象，携带 complete/分页元数据） |
 | `itb.s3.upload.v2` | s3 upload JSON（新增 `status`：uploaded/skipped/reused；skipped/reason 兼容保留） |
 | `itb.s3.download.v2` | s3 download JSON（新增 `status`：downloaded/reused 与 `content_type`） |
 
 ### Added
+
+- 新增 `barcode generate <symbology> <data> <dst>`：纯 Go QR/Code128/Code39/EAN13/EAN8 PNG 生成；L/M/Q/H、模块像素尺寸、quiet zone、固定字体文字与 EAN 校验位；同目录临时文件原子提交，默认不覆盖，`--force` 才替换。
+- 新增 `barcode decode <src>`：内嵌 ZXing-C++ v3.1.1 reader，支持 QR、**Micro QR、rMQR**、Code128/Code39/EAN13/EAN8，多码、四点坐标、EXIF 归一化和重复文本不同位置；`--symbology` 可重复筛选，空 `codes` 成功。Micro QR/rMQR 仅解码；JPEG/PNG/WebP 输入。
+- HTTP 增加 `/api/v1/barcode/generate`（scalar multipart → PNG）与 `/api/v1/barcode/decode`（input multipart → JSON），沿用认证、并发、超时、上传限制，分配前检查输入/计划输出像素尺寸及工作集。
+- `internal/nativebin` 统一原生工具的按需提取与 SHA-256 缓存；六平台构建/真实条码验收，Linux reader 在固定 manylinux_2_28 完全静态链接，原 ABI 规则不变。主程序仍 `CGO_ENABLED=0`、发行包仍只有 itb，无运行时 Python/uv/外装 ZXing。测试专用 writer 不进入发行包。
+- 同步双语 README、API/构建文档、Agent 约束、条码 schema、第三方许可证与 itb Skill 工作流。
 
 - **Commit 1** `s3 list` 完整分页契约：`--page-size`（1-1000，`--max-keys` 保留为 v0.9.x alias）、`--all`、`--limit`、`--continuation-token`；`--limit` 截断发生在 S3 请求边界（MaxKeys 收缩为剩余配额），token 恢复不跳过对象；token 缺失/重复/不前进时返回 `E_INCOMPLETE_LIST`，绝不输出半份结果。
 - **Commit 2** 统一机器可读错误契约 `itb.error.v1`：请求 `--format json` 的命令失败时 stdout 输出一份错误 JSON（schema_version/operation/error{code,message,retryable,http_status,provider_code}），stderr 不再重复；锁定 17 个稳定 `E_*` 错误码；S3 provider 错误只透出 HTTP 状态与 provider code，凭据/签名/原始 provider 文本绝不透出。

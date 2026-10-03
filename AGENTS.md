@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## 项目概述
 
-`itb`（imagetoolbox）是一个用 Go 编写的图片处理 CLI 工具箱，基于 `urfave/cli/v3`。模块路径为 `imagetoolbox`，Go 版本见 `go.mod`（当前 1.26.x）。所有原生压缩工具（pngquant、oxipng、libjpeg-turbo 的 cjpeg/djpeg）以内嵌二进制形式分发，运行时无需外部依赖。
+`itb`（imagetoolbox）是一个用 Go 编写的图片处理 CLI 工具箱，基于 `urfave/cli/v3`。模块路径为 `imagetoolbox`，Go 版本见 `go.mod`（当前 1.26.x）。原生压缩工具（pngquant、oxipng、libjpeg-turbo 的 cjpeg/djpeg）和 ZXing-C++ reader 均以内嵌二进制形式分发。条码生成使用纯 Go；运行时无需 Python/uv 或外装 ZXing，Go 主程序保持 CGO-free。
 
 ## 常用命令
 
@@ -28,7 +28,7 @@ go vet ./...            # 静态检查
 ### 适配器与领域层边界
 
 - Domain 包是图片操作参数的唯一 Normalize/Validate 与业务规则来源。CLI 和 HTTP 只能将传输参数映射为领域 `Options`，不得通过调用 `cli.Command` 或复制业务分派来复用逻辑。
-- HTTP API 只暴露 `compress`、`resize`、`crop`、`rotate`、`convert`、`watermark` 和 `inspect`；S3 管理能力只由 CLI 暴露。
+- HTTP API 只暴露 `compress`、`resize`、`crop`、`rotate`、`convert`、`watermark`、`inspect`、`barcode/generate` 和 `barcode/decode`；S3 管理能力只由 CLI 暴露。
 - CLI 图像命令以 `<src>` / `[dst]` operand 传递本地路径；HTTP 的 `input` 是对应 `<src>` 的 multipart 上传文件，操作选项通常沿用 CLI long flag 名称，`output` 与 `in-place` 不属于 HTTP 参数。HTTP `convert` 保留 transport-only `to`，由 adapter 构造临时输出路径；`internal/convert` 始终只从 outputPath 扩展名确定目标格式。`itb compare <src> <dst>` 是只读分析命令：两个 operand 都是输入（`dst` 是比较目标而非输出文件），因此 compare 绝不调用 `RejectSameFile`，同一文件自我比较合法。
 - File-transform domain APIs own file-safety invariants. An output path must not resolve to the same underlying file as any input resource, including equivalent paths, hard links, and symlinks. In image-watermark mode the watermark image is also an input resource. In-place mutation must use an explicit temporary-file + atomic replacement workflow; adapters must not bypass this rule.
 - HTTP API 是可信远程服务而非远程 Shell：不提供 WebUI、工作流、用户系统、数据库、任务队列、TLS/ACME 或 API S3 管理能力。
@@ -50,6 +50,8 @@ main.go ──→ internal/cmd（CLI）──→ 各领域包 (compress/resize/c
 - `internal/filehash`：跨命令共享的文件哈希 utility（单遍流式多算法摘要 + 读取后可观察变化检测 `VerifyUnchanged`）。inspect/selective hashing、compress 报告与 S3 上传快照共用；不提供 CLI 命令。
 - `internal/stablefile`：内部"稳定源快照"原语（复制到私有临时文件 + 单遍 SHA-256 + `VerifyUnchanged`）。compress 与 S3 upload 共用，保证报告摘要与实际处理内容严格对应（消除 hash 后源被替换的 TOCTOU）；不提供 CLI 命令，不扩大功能边界。
 - `internal/httpapi`：`itb serve` 的标准库 HTTP API（`/api/v1`），直接调用领域包而非 CLI 子进程。
+- `internal/nativebin`：共享内嵌原生工具注册、按工具惰性提取、SHA-256 内容寻址缓存与原子写入；不得在 barcode 复制 compress 提取逻辑。
+- `internal/barcode`：纯 Go PNG 生成及 Gray8 → reader 解码领域层，独占参数校验、像素计划、文件原子提交与公开 schema；无 CLI/HTTP 依赖。
 - `watermark.AddFile` 是文件级水印领域入口。渲染 helper 必须保持包私有，CLI/HTTP adapter 不得绕过该入口。
 
 ### 命令注册约定
@@ -61,7 +63,7 @@ main.go ──→ internal/cmd（CLI）──→ 各领域包 (compress/resize/c
 ### HTTP API 约束（internal/httpapi）
 
 - Web handler 直接构造领域 `Options`，与 CLI 命令参数状态完全隔离，保证并发 HTTP 请求互不污染。
-- 图片处理端点统一 `multipart/form-data`，使用 CLI long flag 名称；结果以二进制流返回并带 `Content-Disposition` 与 `X-ITB-*-Size` 头。
+- 图片处理端点统一 `multipart/form-data`，使用 CLI long flag 名称；图片结果以二进制流返回并带 `Content-Disposition` 与 `X-ITB-*-Size` 头，inspect/条码解码返回 JSON。条码生成仅接受 scalar 字段，没有 input 文件。
 - 每个请求使用独立临时目录（`os.MkdirTemp`），`defer` 清理；不引入数据库/session/任务系统。
 - 安全边界：默认只绑定 `127.0.0.1`；远程部署必须使用 `ITB_API_TOKEN` Bearer token 和反向代理保护。`--no-auth` 仅限 loopback 开发。
 - 上传文件名经 `sanitizeFilename` 清洗，防止路径穿越。
@@ -70,9 +72,19 @@ main.go ──→ internal/cmd（CLI）──→ 各领域包 (compress/resize/c
 
 `main.go` 通过 `//go:embed bins/**` 把 `bins/<os>-<arch>/` 下的原生工具嵌入二进制（平台目录被 gitignore，由 CI 构建注入；`bins/README.md` 是 embed 的兜底匹配文件，必须保留在 git 中，否则全新 checkout 无法编译）：
 
-1. `compress.InitBinaries(embed.FS)` 在 `main` 启动时注入 FS（避免 `compress` 包直接依赖 `main`）。
-2. 首次调用 `compress.EnsureBinary(binType)` 时，`sync.Once` 触发 `extractAllBinaries()`，按 `runtime.GOOS-GOARCH` 选出对应平台的 pngquant/oxipng/djpeg/cjpeg，解压到 `os.TempDir()/img-compress-bins`（已存在且大小相同则跳过写入），返回临时路径供 `exec.Command` 调用。
-3. 平台映射在 `internal/compress/embed.go` 的 `binaryPaths`。**新增平台或工具必须同步更新该映射**，并按 `docs/build-bins.md` 的约定把产物放入 `bins/<os>-<arch>/`（Windows 一律带 `.exe`）。
+1. `nativebin.Init(embed.FS)` 在 `main` 启动时注入 FS（避免领域包直接依赖 `main`）。compress 的 `InitBinaries` / `EnsureBinary` 保留为兼容 facade。
+2. 首次 `nativebin.Ensure(ID)` 按工具独立 `sync.Once`，按 `runtime.GOOS-GOARCH` 读取对应平台工具，提取到用户缓存 `itb/bins/<platform>/<sha256>/<tool>`。复用前校验内容 SHA-256；临时写入、同步、原子替换确保完整缓存。条码生成不会提取 reader。
+3. 平台映射在 `internal/nativebin/registry.go` 的 `binaryPaths`。**新增平台或工具必须同步更新该映射**，并按 `docs/build-bins.md` 的约定把产物放入 `bins/<os>-<arch>/`（Windows 一律带 `.exe`）。
+
+### barcode 契约
+
+- 生成 `qr/code128/code39/ean13/ean8`，Micro QR/rMQR 仅解码。纯 Go generator 固定 `boombuler/barcode v1.1.0`；PNG-only、整数像素，没有 DPI/mm 或系统字体行为。
+- QR 默认 M、module-size=10 px、border=4 modules，支持 L/M/Q/H。线性码 module-width=2 px、bar height=80 px、左右各 10 modules quiet zone、上下各 10 px；默认 `basicfont.Face7x13` 文字另占 20 px。Code39 大写标准字符集、无 checksum；EAN 接受 payload 或正确完整校验码，保留 `data` 并另报 `encoded_text`。
+- `GeneratePlan` 在大画布分配前返回 Width/Height/WorkingBytes。PNG 写同目录临时文件；非 force 使用原子 no-clobber，force 原子替换，失败保留旧文件且无 partial。
+- `DecodeFile` 通过 `imageio.Probe` / `OpenStatic` 接受 JPEG/PNG/WebP，JPEG EXIF 归一化，Go 铺白并转 Gray8。七码制、多个结果与四点定位；相同文本不同位置不得按文本去重，未检出码是成功 `codes: []`。
+- ZXing-C++ 固定 v3.1.1，`native/zxing-reader` reader-only（无 writer/codec/path/network）。stdin 私有 ITBZ v1 Gray8 帧，stdout 内部严格 JSON；`exec.CommandContext` 跟随取消/超时，stdout/stderr 有界。Linux 固定 manylinux_2_28 完全静态链接，原 ABI allowlist 不放宽。
+- HTTP 生成 scalar → GeneratePlan → 输出尺寸/像素/工作集准入；解码 Probe → 输入尺寸/像素/工作集准入 → OpenStatic，禁止在准入前分配像素。decode JSON 的 path 是清洗后的客户端文件名，不能泄漏临时目录。
+- 原生 CI 在六个平台强制测试 Micro QR/rMQR。`native/zxing-test-writer` 的 NEW/experimental writer 仅生成临时 fixture，绝不 embed、安装或发布。
 
 ### 两套格式检测
 
@@ -110,6 +122,8 @@ main.go ──→ internal/cmd（CLI）──→ 各领域包 (compress/resize/c
 | `itb.error.v1` | 所有命令 `--format json` 失败时的 stdout | `schema_version` / `operation` / `error{code,message,retryable,http_status,provider_code}`；稳定 `E_*` 错误码清单见 `internal/cmd/error.go`；stdout 恰好一份 JSON，stderr 不重复 |
 | `itb.inspect.v3` | `inspect --format json` | 新增 `content` 内容识别对象（format/canonical_extension/mime_type/recognized/decode_supported/full_decode_supported/extension_matches）；保留 `decode_config_ok`/`full_decode_ok`/`frame_count`/`animation_known`/`animated` |
 | `itb.compress.v1` | `compress --format json` | input/output（path/format/size/sha256）、quality、processor（`pngquant+oxipng` / `djpeg+cjpeg` 固定命名）、elapsed_ms |
+| `itb.barcode.generate.v1` | `barcode generate --format json` | symbology/data/encoded_text/draw_text、QR 选项、output（path/format/width/height/size_bytes） |
+| `itb.barcode.decode.v1` | `barcode decode --format json`、HTTP decode | input（path/width/height）、codes（text/symbology/points）；空数组成功 |
 | `itb.s3.list.v2` | `s3 list --format json` | 结构化对象（bucket/prefix/complete/count/pages/next_continuation_token/objects）；v1 为裸数组 |
 | `itb.s3.upload.v2` | `s3 upload --format json` | 新增 `status`（uploaded/skipped/reused）；`skipped`/`reason` 兼容保留 |
 | `itb.s3.download.v2` | `s3 download --format json` | 新增 `status`（downloaded/reused）与 `content_type` |
@@ -124,6 +138,7 @@ main.go ──→ internal/cmd（CLI）──→ 各领域包 (compress/resize/c
 - 纯 Go 单测不依赖内嵌的原生二进制；涉及 `compress` 的集成测试才会触发解压流程。
 - `internal/s3/minio_test.go` 包含真实 MinIO 的领域集成测试和编译后 `itb` 二进制 CLI E2E（upload/stat/download/skip/metadata/cache-control/overwrite/verify/delete + path-style，以及 list 分页、skip-matching、条件上传、期望值校验、本地复用与 stdout/stderr 单 JSON 文档契约）。CI 在 workflow step 中通过 `docker run` 启动 MinIO 并分别执行两层测试；本地默认跳过，可用 `ITB_TEST_MINIO_ENDPOINT`（默认 `http://127.0.0.1:9000`）、`ITB_TEST_MINIO_ACCESS_KEY`/`ITB_TEST_MINIO_SECRET_KEY`（默认 `minioadmin`）指向自建实例运行。
 - `internal/cmd/e2e_test.go` 是不依赖 MinIO 的编译后二进制 E2E：inspect 内容识别契约（PNG/JPEG/GIF/WebP/BMP/TIFF/SVG/伪装 SVG/损坏 TIFF、`--hash sha256` 选择性哈希）、`itb.error.v1` stdout/stderr 单文档契约与 compress 失败不留 partial，随 `make test-unit` 真实执行。
+- `internal/barcode/native_test.go` 覆盖真实七码制、roundtrip、多码、旋转/反色、EXIF 与协议；`internal/cmd/barcode_e2e_test.go` 覆盖 compiled CLI。缺失 reader 时仅原生测试跳过；CI 设置 `ITB_REQUIRE_BARCODE_NATIVE=1` 与测试 writer 路径，缺失直接失败。
 
 ## 文档约定
 
@@ -134,7 +149,7 @@ main.go ──→ internal/cmd（CLI）──→ 各领域包 (compress/resize/c
 
 ## 外部工具与 CI
 
-`docs/build-bins.md` 记录 pngquant（3.0.3）、oxipng（v10.1.0）、libjpeg-turbo（3.1.3）的版本与各平台 cmake 构建方式。`.github/workflows/build-binaries.yml` 与 `release.yml` 在 CI 中从源码构建这些原生工具，注入 `bins/`，最后用 `CGO_ENABLED=0` 交叉构建 darwin/linux/windows × amd64/arm64；macOS/Linux 打 `.tar.gz`，Windows 打 `.zip`。Release 会发布六个平台归档及各自 SHA-256 校验和。原生压缩工具在构建阶段放入 `bins/<platform>`，通过 `go:embed` 编入 `itb` 可执行文件；最终发行归档只包含 `itb`，无需独立携带 `bins/` 目录。
+`docs/build-bins.md` 记录 pngquant（3.0.3）、oxipng（v10.1.0）、libjpeg-turbo（3.1.3）、ZXing-C++（v3.1.1）的版本与平台构建方式。`.github/workflows/build-binaries.yml` 与 `release.yml` 在 CI 中从源码构建这些原生工具，注入 `bins/`，最后用 `CGO_ENABLED=0` 构建 darwin/linux/windows × amd64/arm64；macOS/Linux 打 `.tar.gz`，Windows 打 `.zip`。Release 会发布六个平台归档及各自 SHA-256 校验和。原生工具通过 `go:embed` 编入 `itb`；最终发行归档只包含 `itb`，无需独立携带 `bins/` 目录。
 
 ## Release and Homebrew publishing
 

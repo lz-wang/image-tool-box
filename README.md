@@ -500,7 +500,62 @@ itb barcode generate code128 ABC123 label.png --module-width 2 --module-height 8
 itb barcode decode code.png --symbology qr --symbology micro-qr --symbology rmqr --format json
 ```
 
-生成支持 `qr/code128/code39/ean13/ean8`；`micro-qr/rmqr` 仅解码。输出为 PNG；已有文件需 `--force` 才替换。尺寸均使用整数像素，一维码默认绘制文字（`--no-draw-text` 关闭）。成功 JSON 分别为 `itb.barcode.generate.v1` 和 `itb.barcode.decode.v1`；失败沿用 `itb.error.v1`。完整默认值和限制见 `itb barcode generate --help` / `decode --help`。
+生成支持 `qr/code128/code39/ean13/ean8`；`micro-qr/rmqr` 仅解码。生成使用纯 Go，目标必须为 `.png`，先写同目录临时文件再原子提交；已有文件需 `--force` 才替换，失败不留 partial。尺寸为整数像素，没有 DPI、毫米或系统字体依赖。
+
+| 码制 | 生成输入 | 解码 |
+|------|----------|------|
+| `qr` | UTF-8 文本，L/M/Q/H 纠错 | ✅ |
+| `micro-qr` / `rmqr` | 不支持生成 | ✅ |
+| `code128` | 1–80 个 ASCII 字符 | ✅ |
+| `code39` | 大写 A–Z、0–9、空格及 `-.$/+%`，无 checksum | ✅ |
+| `ean13` | 12 位数字自动补校验位，或验证完整 13 位 | ✅ |
+| `ean8` | 7 位数字自动补校验位，或验证完整 8 位 | ✅ |
+
+<details>
+<summary>条码参数、尺寸与 JSON 契约</summary>
+
+| 参数 | 默认值 | 说明 |
+|------|--------|------|
+| `--error-correction` | `M` | QR：`L/M/Q/H` |
+| `--module-size` | `10` | QR 每个模块的像素边长 |
+| `--border` | `4` | QR 每边 quiet zone 的模块数，允许 `0` |
+| `--module-width` | `2` | 一维码最窄模块的像素宽度 |
+| `--module-height` | `80` | 一维码条的像素高度，不含文字和留白 |
+| `--no-draw-text` | `false` | 关闭一维码下方的固定字体文字 |
+| `--force` | `false` | 原子替换已存在的生成目标 |
+| `--symbology` | 全部七种 | decode 筛选，可重复；generate 的码制为 operand |
+| `--format` | `table` | CLI 成功输出：`table/json` |
+
+QR 输出边长为 `(矩阵模块数 + 2 × border) × module-size`。一维码左右各留 10 个模块的 quiet zone，上下各留 10 px；文字默认开启，使用内置 `basicfont.Face7x13`，额外增加 20 px 高度。EAN 的 `data` 保留调用方输入，`encoded_text` 是包含校验位的实际编码文本。
+
+```json
+{
+  "schema_version": "itb.barcode.generate.v1",
+  "symbology": "ean13",
+  "data": "690123456789",
+  "encoded_text": "6901234567892",
+  "draw_text": true,
+  "output": {"path": "label.png", "format": "png", "width": 230, "height": 120, "size_bytes": 1234}
+}
+```
+
+`size_bytes` 随实际编码结果变化；QR 结果另带 `error_correction`、`module_size` 与 `border`。生成工作集上限为 512 MiB。
+
+解码接受 JPEG/PNG/WebP，经 JPEG EXIF Orientation 归一化并将透明区域铺白后扫描。默认搜索全部七种码制，返回多个码；相同文本在不同位置出现时保留各自结果。坐标基于归一化输入的左上角像素坐标，四点顺序为 top-left、top-right、bottom-right、bottom-left。输入最多 64 Mi 像素，单边最多 32768 px。
+
+```json
+{
+  "schema_version": "itb.barcode.decode.v1",
+  "input": {"path": "code.png", "width": 290, "height": 290},
+  "codes": [{"text": "hello", "symbology": "qr", "points": [{"x":40,"y":40},{"x":250,"y":40},{"x":250,"y":250},{"x":40,"y":250}]}]
+}
+```
+
+未检出码时仍成功退出并返回 `"codes": []`；损坏图片、无效码制或不可用的 reader 会失败。CLI 的 `--format json` 失败沿用 `itb.error.v1`，stdout 恰好一份 JSON、stderr 不重复。完整限制见 `itb barcode generate --help` / `decode --help`。
+
+`internal/nativebin` 统一管理内嵌工具的按需提取与 SHA-256 缓存；解码通过内嵌 ZXing-C++ v3.1.1 reader，无需 Python、uv、CGO 或独立部署的 ZXing 文件。发行包仍只有 `itb`。
+
+</details>
 
 ## HTTP API（itb serve）
 
@@ -518,9 +573,9 @@ itb barcode decode code.png --symbology qr --symbology micro-qr --symbology rmqr
 ### 功能范围
 
 - **图片操作**：`compress`、`resize`、`crop`、`rotate`、`convert`、`watermark`、`inspect`、`barcode/generate`、`barcode/decode`
+- **不提供**：S3 管理、WebUI、工作流、用户系统、数据库或任务队列
 
 条码生成和解码使用 `POST /api/v1/barcode/generate` / `decode`，请求均为 multipart。生成字段为 `symbology`、`data` 和 CLI 同名选项，返回 PNG；解码上传 `input` 并可提供逗号分隔的 `symbology`，返回 `itb.barcode.decode.v1` JSON。两者复用认证、并发、超时和上传限制，并在像素分配之前检查计划尺寸与工作内存。
-- **不提供**：S3 管理、WebUI、工作流、用户系统、数据库或任务队列
 
 ### 安全边界
 
@@ -536,7 +591,7 @@ itb barcode decode code.png --symbology qr --symbology micro-qr --symbology rmqr
 | `--max-pixels` | `50000000` | 最大图片像素数（含上传图片、水印图与计划输出尺寸） |
 | `--max-dimension` | `16384` | 最大图片单边尺寸（含上传图片、水印图与计划输出尺寸） |
 | `--max-concurrent` | `2` | 最大并发图片操作数 |
-| `--max-working-bytes` | `512MiB` | 单个操作中间画布内存上限（watermark、任意角度 rotate 等） |
+| `--max-working-bytes` | `512MiB` | 单个操作工作集内存上限（watermark、rotate、条码生成和解码等） |
 | `--timeout` | `2m` | 单个图片操作超时 |
 | `--no-auth` | `false` | 仅 loopback 本地开发时禁用认证 |
 
@@ -546,7 +601,7 @@ API 统一前缀 `/api/v1`，例如健康检查：
 curl http://127.0.0.1:8080/api/v1/health
 ```
 
-图片处理端点使用与 CLI long flag 同名的 `multipart/form-data` 字段，处理结果以流式二进制响应返回。完整参数与部署说明见 [API 文档](docs/api.md) 和 [VPS 部署文档](docs/deployment.md)。
+图片处理端点使用与 CLI long flag 同名的 `multipart/form-data` 字段；图片结果以流式二进制响应返回，inspect 和条码解码返回 JSON。条码生成不上传 input。完整参数与部署说明见 [API 文档](docs/api.md) 和 [VPS 部署文档](docs/deployment.md)。
 
 ```bash
 curl -H "Authorization: Bearer $ITB_API_TOKEN" \
@@ -991,7 +1046,5 @@ Size、ETag、Content-Type、Storage Class、Cache-Control、Version ID 与用�
 </details>
 
 ## 许可证
-
-内部实现：`internal/nativebin` 统一管理内嵌工具的按需提取与 SHA-256 缓存；`internal/barcode` 提供纯 Go 的 QR、Code128、Code39、EAN13/EAN8 PNG 生成，以及通过内嵌 ZXing reader 解码上述码制和 Micro QR/rMQR 的领域接口。解码返回多码定位点；未检出码时成功返回空数组。
 
 本项目使用 MIT 许可证。内置的第三方工具请参阅 [LICENSE-THIRD-PARTY.md](./LICENSE-THIRD-PARTY.md)。

@@ -200,6 +200,76 @@ Requirements and semantics:
 - Alpha handling: when either image has `alpha != 255`, the compared channels become premultiplied R/G/B plus A (fully transparent regions hide their RGB, and alpha loss is still detected). This is an itb-defined alpha-aware variant; do not expect bit-identical values with RGB-only third-party tools.
 - Output is fixed-order plain text (`%.6f`), independent of flag order; identical images print `PSNR: +Inf dB`, `SSIM: 1.000000`, `MS-SSIM: 1.000000`. There is intentionally no `--format json` yet.
 
+## Barcode generation and decoding
+
+```bash
+itb barcode generate qr 'https://example.com' code.png --format json
+itb barcode generate qr hello code.png --error-correction H --module-size 8 --border 4
+itb barcode generate code128 ABC123 label.png --module-width 2 --module-height 80
+itb barcode generate ean13 690123456789 label.png --no-draw-text
+itb barcode decode code.png --format json
+itb barcode decode code.png --symbology qr --symbology micro-qr --symbology rmqr --format json
+```
+
+Generation supports `qr/code128/code39/ean13/ean8`; `micro-qr/rmqr` are decode-only. Generation uses pure Go and requires a `.png` destination. Output is staged in the destination directory and committed atomically; replacing an existing file requires `--force`, and failures leave no partial output. Dimensions use integer pixels, with no DPI, millimeter or system-font dependency.
+
+| Symbology | Generation input | Decode |
+|------|----------|------|
+| `qr` | UTF-8 text, L/M/Q/H error correction | ✅ |
+| `micro-qr` / `rmqr` | Generation unsupported | ✅ |
+| `code128` | 1–80 ASCII characters | ✅ |
+| `code39` | Uppercase A–Z, 0–9, space and `-.$/+%`, without checksum | ✅ |
+| `ean13` | 12 digits with computed checksum, or validated full 13 digits | ✅ |
+| `ean8` | 7 digits with computed checksum, or validated full 8 digits | ✅ |
+
+<details>
+<summary>Barcode options, dimensions and JSON contracts</summary>
+
+| Option | Default | Description |
+|------|--------|------|
+| `--error-correction` | `M` | QR: `L/M/Q/H` |
+| `--module-size` | `10` | QR module side length in pixels |
+| `--border` | `4` | QR quiet zone per side in modules; `0` allowed |
+| `--module-width` | `2` | Narrowest linear module width in pixels |
+| `--module-height` | `80` | Linear bar height in pixels, excluding text and margins |
+| `--no-draw-text` | `false` | Omit fixed-font text below linear codes |
+| `--force` | `false` | Atomically replace an existing generation target |
+| `--symbology` | All seven | Repeatable decode filter; generation uses an operand |
+| `--format` | `table` | CLI success output: `table/json` |
+
+QR output side length is `(matrix modules + 2 × border) × module-size`. Linear codes have a ten-module quiet zone on each horizontal side and 10 px top/bottom margins. Text is enabled by default, uses the embedded `basicfont.Face7x13`, and adds 20 px to the height. For EAN, `data` preserves caller input while `encoded_text` contains the actual code including its checksum.
+
+```json
+{
+  "schema_version": "itb.barcode.generate.v1",
+  "symbology": "ean13",
+  "data": "690123456789",
+  "encoded_text": "6901234567892",
+  "draw_text": true,
+  "output": {"path": "label.png", "format": "png", "width": 230, "height": 120, "size_bytes": 1234}
+}
+```
+
+`size_bytes` varies with the encoded output; QR results also contain `error_correction`, `module_size` and `border`. Generation has a 512 MiB working-memory bound.
+
+Decoding accepts JPEG/PNG/WebP, normalizes JPEG EXIF Orientation and composites transparent regions onto white before scanning. All seven formats are searched by default and multiple codes are returned; identical text at different positions remains separate. Coordinates use pixels from the top-left of the normalized input, in top-left, top-right, bottom-right, bottom-left order. Inputs are limited to 64 Mi pixels and 32768 px per dimension.
+
+```json
+{
+  "schema_version": "itb.barcode.decode.v1",
+  "input": {"path": "code.png", "width": 290, "height": 290},
+  "codes": [{"text": "hello", "symbology": "qr", "points": [{"x":40,"y":40},{"x":250,"y":40},{"x":250,"y":250},{"x":40,"y":250}]}]
+}
+```
+
+No detected codes is still success and returns `"codes": []`; damaged images, invalid symbologies and unavailable readers fail. CLI failures with `--format json` use `itb.error.v1`, exactly one JSON document on stdout with no duplicate on stderr. See `itb barcode generate --help` / `decode --help` for full constraints.
+
+`internal/nativebin` manages lazy extraction and SHA-256 caching of embedded tools. Decoding uses an embedded ZXing-C++ v3.1.1 reader, without Python, uv, CGO or a separately deployed ZXing file. Release archives still contain only `itb`.
+
+</details>
+
+HTTP: `POST /api/v1/barcode/generate` accepts scalar multipart `symbology`, `data` and the generation options above, returning PNG; `POST /api/v1/barcode/decode` accepts `input` and optional comma-separated `symbology`, returning JSON. HTTP has no `output`, `force` or `format` field. Both use the existing token, concurrency, timeout and pre-allocation resource limits. Decode input path is the sanitized client filename.
+
 ## Inspect
 
 Read-only file/image inspection with hashes; JSON contract `itb.inspect.v3`.
@@ -420,7 +490,7 @@ Authentication:
 - Image-processing requests use `Authorization: Bearer $ITB_API_TOKEN`.
 - `/api/v1/health` remains unauthenticated.
 
-Feature scope: `compress`, `resize`, `crop`, `rotate`, `convert`, `watermark`, and `inspect`. The HTTP API intentionally does not expose S3 management, a WebUI, workflows, user management, databases, or task queues.
+Feature scope: `compress`, `resize`, `crop`, `rotate`, `convert`, `watermark`, `inspect`, `barcode/generate` and `barcode/decode`. The HTTP API intentionally does not expose S3 management, a WebUI, workflows, user management, databases, or task queues.
 
 Security notes:
 

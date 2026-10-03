@@ -5,7 +5,7 @@ It is not a remote shell: S3 management, workflows, user management, queues, and
 
 All image operations require `Authorization: Bearer $ITB_API_TOKEN`. `GET /api/v1/health` does not require authentication and returns `{"status":"ok"}`.
 
-Every operation uses `multipart/form-data`. `input` is the required source image file. Except for the transport-only `convert` field `to`, operation option names match the corresponding CLI long flag. Image-transforming endpoints stream binary downloads with `Content-Disposition`, `X-ITB-Input-Size`, `X-ITB-Output-Size`, and `X-ITB-Operation` headers. `inspect` always returns JSON.
+Every operation uses `multipart/form-data`. `input` is the required source image file except for barcode generation, which accepts scalar fields only. Except for the transport-only `convert` field `to`, operation option names match the corresponding CLI long flag. Image-transforming endpoints stream binary downloads with `Content-Disposition`, `X-ITB-Input-Size`, `X-ITB-Output-Size`, and `X-ITB-Operation` headers. `inspect` and barcode decoding return JSON.
 
 Scalar fields are limited to 4 KiB (16 KiB for `text`); an oversized field is rejected with `413 payload_too_large`. Uploaded files are stored under server-generated temporary names — client filenames are only used for download names — so identical filenames for `input` and `image` never collide.
 
@@ -20,6 +20,8 @@ Scalar fields are limited to 4 KiB (16 KiB for `text`); an oversized field is re
 | `POST /api/v1/convert` | `input`, `to`, `quality`, `lossless`, `background` |
 | `POST /api/v1/watermark` | `input`, `text`, `image`, `mode`, `color`, `space`, `angle`, `opacity`, `font`, `font-size`, `position`, `margin`, `scale` |
 | `POST /api/v1/inspect` | `input`, `detail`, `no-detail`, `no-hash`, `strict`, `full-decode` |
+| `POST /api/v1/barcode/generate` | `symbology`, `data`, `error-correction`, `module-size`, `border`, `module-width`, `module-height`, `no-draw-text` (no file upload) |
+| `POST /api/v1/barcode/decode` | `input`, optional comma-separated `symbology` |
 
 `inspect` never requires a decodable image: with `strict` unset (or `false`) it returns file metadata plus an `error` object for undecodable inputs; with `strict=true` decoding failures return `400`.
 
@@ -34,6 +36,27 @@ For `resize`, `filter` accepts `nearest`, `linear`, `mitchell`, `catmullrom`, or
 `rotate` rotates by a floating-point `angle` in degrees: positive = counter-clockwise, negative = clockwise, range `(-360, 360)`, never `0`. Exact `90/180/270` are interpolation-free; arbitrary angles adjust the output canvas as needed (uncovered areas stay transparent for PNG/WebP and flatten onto white for JPEG). The planned output dimensions are admitted before allocation, so an angle that would expand a valid input beyond the limits returns `413 image_too_large`. The rotate working set (an NRGBA source copy plus the output canvas for arbitrary angles) is admitted against `--max-working-bytes` before allocation as well.
 
 Unknown fields, duplicate fields, and legacy `file`, `watermark`, or `options` fields return `400`; they are not silently ignored.
+
+### Barcode generation and decoding
+
+Generation requires `symbology` and `data`; supported values are `qr`, `code128`, `code39`, `ean13` and `ean8`. Micro QR (`micro-qr`) and rMQR (`rmqr`) are decode-only. QR defaults are `error-correction=M` (L/M/Q/H), `module-size=10` pixels and `border=4` modules. Linear defaults are `module-width=2` pixels, `module-height=80` pixels and text enabled (`no-draw-text=false`), with ten-module horizontal quiet zones and 10 px vertical margins. All dimensions are integer pixels. Content restrictions and EAN checksum rules match the [CLI barcode contract](../README.en.md#barcode-generation-and-decoding).
+
+Generation returns `image/png`, attachment `barcode.png`, `X-ITB-Operation: barcode.generate`, `X-ITB-Barcode-Symbology`, `X-ITB-Input-Size: 0` and `X-ITB-Output-Size`. There are no HTTP `output`, `force` or `format` fields. It calls the domain `GeneratePlan`, admits output dimensions, pixel count and `WorkingBytes` before rendering, and removes the per-request temporary file after responding.
+
+Decoding accepts JPEG/PNG/WebP, with JPEG EXIF Orientation normalized and alpha composited onto white. Omitted `symbology` searches all seven formats; e.g. `qr,micro-qr,rmqr` restricts the search. The `itb.barcode.decode.v1` JSON contains `input{path,width,height}` and `codes[]{text,symbology,points}`. `input.path` is the sanitized client filename, never a server path. Points are four pixel coordinates in top-left, top-right, bottom-right, bottom-left order in the normalized image. Multiple results and identical text at different positions are preserved. **No detected codes returns HTTP 200 with `codes: []`.** Invalid formats/parameters fail with 400, unsupported image formats with 415, and unavailable or failed native readers with 500 `internal_error`.
+
+Both endpoints use the existing token authentication, concurrency, timeout and multipart limits. Decode input dimensions and working memory (decoded image, Gray8, protocol and native scratch estimate) are admitted before full decode or pixel allocation; domain limits additionally cap inputs at 64 Mi pixels and 32768 px per dimension. Limit failures return 413 `image_too_large`. The native process follows request cancellation/deadlines.
+
+```bash
+curl -H "Authorization: Bearer $ITB_API_TOKEN" \
+  -F 'symbology=qr' -F 'data=https://example.com' \
+  -F 'error-correction=H' -F 'module-size=8' \
+  "$API/barcode/generate" -o code.png
+
+curl -H "Authorization: Bearer $ITB_API_TOKEN" \
+  -F 'input=@code.png' -F 'symbology=qr,micro-qr,rmqr' \
+  "$API/barcode/decode"
+```
 
 ### Examples
 
