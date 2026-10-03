@@ -1033,4 +1033,6 @@ Scripts should branch on `schema_version` instead of parsing terminal text.
 
 ## License
 
+Implementation: `internal/nativebin` manages lazy extraction and SHA-256 caching of embedded tools; `internal/barcode` supplies pure-Go domain APIs for QR, Code128, Code39 and EAN13/EAN8 PNG generation. See the barcode documentation for the CLI/HTTP interfaces.
+
 This project is released under the MIT license. For the bundled third-party tools, see [LICENSE-THIRD-PARTY.md](./LICENSE-THIRD-PARTY.md).
