@@ -508,7 +508,7 @@ itb barcode generate code128 ABC123 label.png --module-width 2 --module-height 8
 itb barcode decode code.png --symbology qr --symbology micro-qr --symbology rmqr --format json
 ```
 
-生成支持 `qr/code128/code39/ean13/ean8`；`micro-qr/rmqr` 仅解码。生成使用纯 Go，目标必须为 `.png`，自动创建不存在的父目录，完整写入同目录临时文件后提交；默认原子 no-clobber，已有文件需 `--force` 才替换。强制替换在 Unix 上使用同目录原子 rename，Windows 不保证原子替换；失败会清理暂存文件，不留下 partial。尺寸为整数像素，没有 DPI、毫米或系统字体依赖。
+生成支持 `qr/code128/code39/ean13/ean8`；`micro-qr/rmqr` 仅解码。生成使用纯 Go，目标必须为 `.png`，自动创建不存在的父目录，完整写入同目录临时文件后提交；Unix 输出 PNG 权限统一为 `0644`。默认原子 no-clobber，已有文件需 `--force` 才替换。强制替换在 Unix 上使用同目录原子 rename，Windows 不保证原子替换；失败会清理暂存文件，不留下 partial。尺寸为整数像素，没有 DPI、毫米或系统字体依赖。
 
 | 码制 | 生成输入 | 解码 |
 |------|----------|------|

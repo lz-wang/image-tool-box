@@ -10,6 +10,7 @@ import (
 	"image/png"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"sync"
 	"testing"
@@ -238,6 +239,42 @@ func TestGenerateCreatesParentDirectories(t *testing.T) {
 			entries, err := os.ReadDir(filepath.Dir(dst))
 			if err != nil || len(entries) != 1 {
 				t.Fatalf("temporary output left behind: %v, %v", entries, err)
+			}
+		})
+	}
+}
+
+func TestGeneratedFileMode(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("Unix file permissions do not apply on Windows")
+	}
+	for _, tc := range []struct {
+		name     string
+		force    bool
+		existing bool
+	}{
+		{"new", false, false},
+		{"new-force", true, false},
+		{"replace", true, true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			dst := filepath.Join(t.TempDir(), "code.png")
+			if tc.existing {
+				if err := os.WriteFile(dst, []byte("replace me"), 0o600); err != nil {
+					t.Fatal(err)
+				}
+			}
+			o := DefaultGenerateOptions()
+			o.Data = "hello"
+			if _, err := GenerateFile(context.Background(), dst, o, tc.force); err != nil {
+				t.Fatal(err)
+			}
+			info, err := os.Stat(dst)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got := info.Mode().Perm(); got != 0o644 {
+				t.Fatalf("mode=%o, want 0644", got)
 			}
 		})
 	}

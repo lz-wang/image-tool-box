@@ -6,6 +6,7 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed
 
+- 条码生成在提交完整 PNG 前将文件权限设为 `0644`，统一普通生成与 `--force` 替换在 Unix 上的输出权限，并增加文件权限回归测试。
 - 条码生成领域层明确校验 Code128 的 1..80 ASCII 字符限制，自动创建输出父目录，并在计划尺寸与 HTTP 准入中计入完整固定字体文字及水平留白，避免长数字 Code128 文字裁剪。`itb.barcode.generate.v1` 字段与版本不变；开启文字时部分输出宽度会增加。
 - 修正条码 `--force` 的跨平台说明：完整暂存后替换，Unix 同目录 rename 为原子操作，Windows 不保证原子性；同时澄清 Linux 压缩工具的 glibc 2.28 要求与完全静态链接 reader 的区别。
 

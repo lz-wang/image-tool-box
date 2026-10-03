@@ -520,7 +520,7 @@ itb barcode generate code128 ABC123 label.png --module-width 2 --module-height 8
 itb barcode decode code.png --symbology qr --symbology micro-qr --symbology rmqr --format json
 ```
 
-Generation supports `qr/code128/code39/ean13/ean8`; `micro-qr/rmqr` are decode-only. Generation uses pure Go and requires a `.png` destination. Missing parent directories are created automatically. A complete PNG is staged in the destination directory before committing, with atomic no-clobber by default. Replacing an existing file requires `--force`: same-directory rename is atomic on Unix, while Windows replacement is not guaranteed to be atomic. Failures clean up staged files and leave no partial output. Dimensions use integer pixels, with no DPI, millimeter or system-font dependency.
+Generation supports `qr/code128/code39/ean13/ean8`; `micro-qr/rmqr` are decode-only. Generation uses pure Go and requires a `.png` destination. Missing parent directories are created automatically. A complete PNG is staged in the destination directory before committing; output PNG permissions on Unix are set to `0644`. Atomic no-clobber is the default. Replacing an existing file requires `--force`: same-directory rename is atomic on Unix, while Windows replacement is not guaranteed to be atomic. Failures clean up staged files and leave no partial output. Dimensions use integer pixels, with no DPI, millimeter or system-font dependency.
 
 | Symbology | Generation input | Decode |
 |------|----------|------|

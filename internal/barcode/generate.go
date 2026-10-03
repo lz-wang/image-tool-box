@@ -186,6 +186,9 @@ func (p Plan) WriteFile(ctx context.Context, dst string, force bool) (GenerateRe
 	if err = f.Sync(); err != nil {
 		return GenerateResult{}, err
 	}
+	if err = f.Chmod(0o644); err != nil {
+		return GenerateResult{}, err
+	}
 	info, err := f.Stat()
 	if err != nil {
 		return GenerateResult{}, err
