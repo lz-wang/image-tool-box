@@ -529,7 +529,9 @@ Alongside the local CLI, `itb serve` provides a `/api/v1` HTTP API that calls do
 
 ### Feature scope
 
-- **Image operations**: `compress`, `resize`, `crop`, `rotate`, `convert`, `watermark`, and `inspect`
+- **Image operations**: `compress`, `resize`, `crop`, `rotate`, `convert`, `watermark`, `inspect`, `barcode/generate`, and `barcode/decode`
+
+Barcode generation and decoding use `POST /api/v1/barcode/generate` / `decode` with multipart requests. Generation accepts `symbology`, `data` and options named after CLI flags and returns PNG. Decoding accepts an `input` upload and optional comma-separated `symbology`, returning `itb.barcode.decode.v1` JSON. Both reuse authentication, concurrency, timeout and upload limits, with planned dimensions and working memory checked before pixel allocation.
 - **Not exposed**: S3 management, WebUI, workflows, user management, databases, or job queues
 
 ### Security boundary

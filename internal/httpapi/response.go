@@ -13,6 +13,7 @@ import (
 	"path/filepath"
 	"strconv"
 
+	"imagetoolbox/internal/barcode"
 	"imagetoolbox/internal/compress"
 	"imagetoolbox/internal/imageio"
 )
@@ -70,6 +71,8 @@ func operationErrorStatus(err error) int {
 		return http.StatusGatewayTimeout
 	case errors.Is(err, ErrImageTooLarge):
 		return http.StatusRequestEntityTooLarge
+	case errors.Is(err, barcode.ErrDecoderFailure), errors.Is(err, barcode.ErrDecoderUnavailable):
+		return http.StatusInternalServerError
 	case errors.Is(err, imageio.ErrUnsupportedFormat), errors.Is(err, compress.ErrUnsupportedFormat):
 		return http.StatusUnsupportedMediaType
 	default:

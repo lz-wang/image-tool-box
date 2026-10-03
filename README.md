@@ -517,7 +517,9 @@ itb barcode decode code.png --symbology qr --symbology micro-qr --symbology rmqr
 
 ### 功能范围
 
-- **图片操作**：`compress`、`resize`、`crop`、`rotate`、`convert`、`watermark`、`inspect`
+- **图片操作**：`compress`、`resize`、`crop`、`rotate`、`convert`、`watermark`、`inspect`、`barcode/generate`、`barcode/decode`
+
+条码生成和解码使用 `POST /api/v1/barcode/generate` / `decode`，请求均为 multipart。生成字段为 `symbology`、`data` 和 CLI 同名选项，返回 PNG；解码上传 `input` 并可提供逗号分隔的 `symbology`，返回 `itb.barcode.decode.v1` JSON。两者复用认证、并发、超时和上传限制，并在像素分配之前检查计划尺寸与工作内存。
 - **不提供**：S3 管理、WebUI、工作流、用户系统、数据库或任务队列
 
 ### 安全边界

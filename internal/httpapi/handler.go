@@ -53,6 +53,8 @@ func newHandler(cfg Config) http.Handler {
 	route(mux, http.MethodPost, "/api/v1/convert", protected(cfg, sem, imageHandler(cfg, "convert", convertImage)))
 	route(mux, http.MethodPost, "/api/v1/watermark", protected(cfg, sem, imageHandler(cfg, "watermark", watermarkImage)))
 	route(mux, http.MethodPost, "/api/v1/inspect", protected(cfg, sem, inspectHandler(cfg)))
+	route(mux, http.MethodPost, "/api/v1/barcode/generate", protected(cfg, sem, barcodeHandler(cfg, true)))
+	route(mux, http.MethodPost, "/api/v1/barcode/decode", protected(cfg, sem, barcodeHandler(cfg, false)))
 	mux.HandleFunc("/", notFound)
 	return accessLog(cfg, recoverMiddleware(cfg.Logger, mux))
 }
