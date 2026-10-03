@@ -1,0 +1,4 @@
+interface:
+  display_name: "图片工具箱"
+  short_description: "安装并使用 itb 完成图片处理、条码生成识别与 S3 存储和接口集成"
+  default_prompt: "使用 $image-tool-box 完成图片处理任务，按需查看安装方式和常见用法。"

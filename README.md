@@ -52,6 +52,12 @@ brew install lz-wang/tap/itb
 
 > **文件安全**：显式提供 `<dst>` 时，输出不得与任何输入资源指向同一实际文件（包括等价路径、hard link 和 symlink）。`resize`、`crop`、`rotate`、`watermark` 等命令可省略 `[dst]` 以使用默认派生输出路径；`convert` 必须显式提供 `<dst>`。原地压缩请使用 `compress --in-place`。
 
+## 图片工具箱 Skill
+
+仓库提供中文 [`image-tool-box` Skill](skills/image-tool-box/SKILL.md)，用于让支持 Skill 的代理调用 `itb`。入口按任务选择命令，安装、图片处理、条码、S3 和 HTTP API 的详细用法放在 `references/` 中按需阅读。
+
+将完整 `skills/image-tool-box/` 目录复制到代理的 Skill 搜索目录；程序与 Skill 分别安装，可执行程序仍叫 `itb`。安装及升级步骤见 [Skill 安装指引](skills/image-tool-box/references/installation.md)。
+
 ## 压缩图片
 
 自动检测图片格式（PNG/JPEG）并压缩，默认保留原文件：

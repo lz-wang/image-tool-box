@@ -157,9 +157,9 @@ main.go ──→ internal/cmd（CLI）──→ 各领域包 (compress/resize/c
 
 发布前运行 `make check`、`make test` 与 `git diff --check`；推送带注释标签后，确认 GitHub Release 的六个归档和六个 `.sha256` 文件，以及 Homebrew Formula 提交均已完成。`HOMEBREW_TAP_TOKEN` 必须对 `lz-wang/homebrew-tap` 具有 Contents 读写权限；WebDAV 凭据与可选 Pushover 通知均通过 GitHub Actions Secrets 配置，绝不写入仓库。
 
-## skills/itb
+## skills/image-tool-box
 
-`skills/itb/` 是随仓库签入的 Claude Code Skill（`.gitignore` 中显式 `!skills/itb/**` 保留），指导在图像工作流里正确选择 `itb` 命令与 flag。修改 CLI 行为时同步检查其 `SKILL.md` 与 `references/` 是否需要更新。
+`skills/image-tool-box/` 是随仓库签入的中文 Skill（`.gitignore` 中显式 `!skills/image-tool-box/**` 保留），名称为 `image-tool-box`，可执行程序仍叫 `itb`。入口只保留共用流程与约束，安装方式、图片处理、条码、S3 和 HTTP API 用法按需从 `references/` 加载。修改 CLI 行为时同步检查其 `SKILL.md` 与相关参考文档是否需要更新。
 
 ## 开发约定（来自全局规则）
 

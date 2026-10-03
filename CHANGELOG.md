@@ -19,6 +19,7 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
+- 将仓库 Skill 从 `skills/itb` 重命名为 `skills/image-tool-box`，统一中文说明与界面元数据，补充程序和 Skill 安装方式，并将图片、条码、S3、HTTP API 用法拆为按需加载的参考文档；可执行命令仍为 `itb`。
 - 新增 `barcode generate <symbology> <data> <dst>`：纯 Go QR/Code128/Code39/EAN13/EAN8 PNG 生成；L/M/Q/H、模块像素尺寸、quiet zone、固定字体文字与 EAN 校验位；同目录临时文件原子提交，默认不覆盖，`--force` 才替换。
 - 新增 `barcode decode <src>`：内嵌 ZXing-C++ v3.1.1 reader，支持 QR、**Micro QR、rMQR**、Code128/Code39/EAN13/EAN8，多码、四点坐标、EXIF 归一化和重复文本不同位置；`--symbology` 可重复筛选，空 `codes` 成功。Micro QR/rMQR 仅解码；JPEG/PNG/WebP 输入。
 - HTTP 增加 `/api/v1/barcode/generate`（scalar multipart → PNG）与 `/api/v1/barcode/decode`（input multipart → JSON），沿用认证、并发、超时、上传限制，分配前检查输入/计划输出像素尺寸及工作集。

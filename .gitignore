@@ -3,7 +3,7 @@ bins/*
 !bins/README.md
 test-images
 itb
-!skills/itb/
-!skills/itb/**
+!skills/image-tool-box/
+!skills/image-tool-box/**
 .codegraph
 .playwright-cli/

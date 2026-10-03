@@ -52,6 +52,12 @@ After installing, verify with `itb --version` (or `itb version`).
 
 > **File safety:** when an explicit `<dst>` is provided, the output must not resolve to the same file as any input resource, including equivalent paths, hard links, and symbolic links. `resize`, `crop`, `rotate`, and `watermark` may derive a default destination when `[dst]` is omitted; `convert` requires `<dst>`. Use `compress --in-place` for in-place compression.
 
+## Image Toolbox Skill
+
+The repository includes the Chinese-language [`image-tool-box` Skill](skills/image-tool-box/SKILL.md) for agents that support Skills to invoke `itb`. The entry point routes each task to a command; installation, image processing, barcodes, S3, and HTTP API details are loaded from `references/` as needed.
+
+Copy the complete `skills/image-tool-box/` directory into the agent's Skill search directory. Install the executable and Skill separately; the executable is still named `itb`. See the [Skill installation guide](skills/image-tool-box/references/installation.md) for installation and upgrade steps.
+
 ## Compress images
 
 Auto-detects the image format (PNG/JPEG) and compresses it, keeping the original file by default:
