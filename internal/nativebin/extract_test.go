@@ -1,4 +1,4 @@
-package compress
+package nativebin
 
 import (
 	"io/fs"
@@ -11,7 +11,7 @@ import (
 )
 
 func TestExtractedBinaryName(t *testing.T) {
-	got := extractedBinaryName(PngQuant)
+	got := extractedBinaryName(PNGQuant)
 	if runtime.GOOS == "windows" {
 		if got != "pngquant.exe" {
 			t.Fatalf("expected Windows binary name to end with .exe, got %q", got)
@@ -23,18 +23,18 @@ func TestExtractedBinaryName(t *testing.T) {
 	}
 }
 
-func TestEnsureBinaryLazyContentAddressedAndCached(t *testing.T) {
+func TestEnsureLazyContentAddressedAndCached(t *testing.T) {
 	cacheDir := t.TempDir()
 	withTestBinaries(t, cacheDir, []byte("first fake pngquant"))
 
-	path, err := EnsureBinary(PngQuant)
+	path, err := Ensure(PNGQuant)
 	if err != nil {
-		t.Fatalf("EnsureBinary(PngQuant): %v", err)
+		t.Fatalf("Ensure(PNGQuant): %v", err)
 	}
 	if _, err := os.Stat(path); err != nil {
 		t.Fatalf("extracted binary missing: %v", err)
 	}
-	for _, binType := range []BinaryType{OxiPng, DJpeg, CJpeg} {
+	for _, binType := range []ID{OxiPNG, DJPEG, CJPEG} {
 		matches, _ := filepath.Glob(filepath.Join(cacheDir, "itb", "bins", getPlatformKey(), "*", extractedBinaryName(binType)))
 		if len(matches) != 0 {
 			t.Fatalf("%s should not be extracted by pngquant request: %v", binType, matches)
@@ -45,9 +45,9 @@ func TestEnsureBinaryLazyContentAddressedAndCached(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	pathAgain, err := EnsureBinary(PngQuant)
+	pathAgain, err := Ensure(PNGQuant)
 	if err != nil {
-		t.Fatalf("second EnsureBinary(PngQuant): %v", err)
+		t.Fatalf("second Ensure(PNGQuant): %v", err)
 	}
 	if pathAgain != path {
 		t.Fatalf("cache path changed: got %q, want %q", pathAgain, path)
@@ -61,7 +61,7 @@ func TestEnsureBinaryLazyContentAddressedAndCached(t *testing.T) {
 	}
 }
 
-func TestEnsureBinarySameSizeDifferentContentUsesDifferentPaths(t *testing.T) {
+func TestEnsureSameSizeDifferentContentUsesDifferentPaths(t *testing.T) {
 	cacheDir := t.TempDir()
 	first := []byte("same-length-content-a")
 	second := []byte("same-length-content-b")
@@ -69,12 +69,12 @@ func TestEnsureBinarySameSizeDifferentContentUsesDifferentPaths(t *testing.T) {
 		t.Fatal("test inputs must have the same size")
 	}
 	withTestBinaries(t, cacheDir, first)
-	firstPath, err := EnsureBinary(PngQuant)
+	firstPath, err := Ensure(PNGQuant)
 	if err != nil {
 		t.Fatal(err)
 	}
 	withTestBinaries(t, cacheDir, second)
-	secondPath, err := EnsureBinary(PngQuant)
+	secondPath, err := Ensure(PNGQuant)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -83,7 +83,7 @@ func TestEnsureBinarySameSizeDifferentContentUsesDifferentPaths(t *testing.T) {
 	}
 }
 
-func TestEnsureBinaryConcurrentExtraction(t *testing.T) {
+func TestEnsureConcurrentExtraction(t *testing.T) {
 	cacheDir := t.TempDir()
 	withTestBinaries(t, cacheDir, []byte("concurrent fake pngquant"))
 
@@ -95,7 +95,7 @@ func TestEnsureBinaryConcurrentExtraction(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			path, err := EnsureBinary(PngQuant)
+			path, err := Ensure(PNGQuant)
 			if err != nil {
 				errs <- err
 				return
@@ -107,7 +107,7 @@ func TestEnsureBinaryConcurrentExtraction(t *testing.T) {
 	close(paths)
 	close(errs)
 	for err := range errs {
-		t.Errorf("EnsureBinary: %v", err)
+		t.Errorf("Ensure: %v", err)
 	}
 
 	var first string
@@ -170,7 +170,7 @@ func withTestBinaries(t *testing.T, cacheDir string, pngquant []byte) {
 	source := make(fstest.MapFS, len(platformPaths))
 	for binType, path := range platformPaths {
 		data := []byte("fake " + string(binType))
-		if binType == PngQuant {
+		if binType == PNGQuant {
 			data = pngquant
 		}
 		source[path] = &fstest.MapFile{Data: data, Mode: fs.FileMode(0755)}
@@ -180,7 +180,7 @@ func withTestBinaries(t *testing.T, cacheDir string, pngquant []byte) {
 	previousCacheBaseDir := cacheBaseDir
 	cacheBaseDir = func() (string, error) { return cacheDir, nil }
 	binariesMu.Unlock()
-	InitBinaries(source)
+	Init(source)
 	t.Cleanup(func() {
 		binariesMu.Lock()
 		cacheBaseDir = previousCacheBaseDir

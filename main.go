@@ -10,7 +10,7 @@ import (
 	"syscall"
 
 	"imagetoolbox/internal/cmd"
-	"imagetoolbox/internal/compress"
+	"imagetoolbox/internal/nativebin"
 )
 
 //go:embed bins/**
@@ -19,7 +19,7 @@ var binaries embed.FS
 var version = "dev"
 
 func main() {
-	compress.InitBinaries(binaries)
+	nativebin.Init(binaries)
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
