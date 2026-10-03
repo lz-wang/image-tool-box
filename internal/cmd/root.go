@@ -38,6 +38,7 @@ constraints, and examples.`,
 			newInspectCommand(),
 			newS3Command(),
 			newServeCommand(),
+			newBarcodeCommand(),
 			newVersionCommand(version),
 		},
 	}

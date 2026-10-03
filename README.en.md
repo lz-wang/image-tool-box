@@ -504,6 +504,16 @@ decodes the file and adds:
 | `animation_known` | Whether `animated` is trustworthy: always `true` for JPEG/PNG/BMP/TIFF; GIF requires `--full-decode`; WebP comes from the VP8X header sniff |
 | `animated` | Animation state, meaningful only when `animation_known=true` |
 
+## Barcode generation and decoding
+
+```bash
+itb barcode generate qr 'https://example.com' code.png --format json
+itb barcode generate code128 ABC123 label.png --module-width 2 --module-height 80
+itb barcode decode code.png --symbology qr --symbology micro-qr --symbology rmqr --format json
+```
+
+Generation supports `qr/code128/code39/ean13/ean8`; `micro-qr/rmqr` are decode-only. Output is PNG; existing files require `--force` for replacement. Dimensions use integer pixels and linear codes draw text by default (`--no-draw-text` disables it). Success JSON uses `itb.barcode.generate.v1` and `itb.barcode.decode.v1`; failures use `itb.error.v1`. See `itb barcode generate --help` / `decode --help` for exact defaults and constraints.
+
 ## HTTP API (itb serve)
 
 Alongside the local CLI, `itb serve` provides a `/api/v1` HTTP API that calls domain packages directly rather than spawning CLI subprocesses. It is intended for trusted personal VPS deployments, not a WebUI, S3-management, workflow, or user-management service.

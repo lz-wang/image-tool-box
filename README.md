@@ -492,6 +492,16 @@ JSON 契约版本为 `itb.inspect.v3`。v3 新增 `content` 内容识别对象�
 | `animation_known` | `animated` 是否可信：JPEG/PNG/BMP/TIFF 恒为 `true`；GIF 需要 `--full-decode`；WebP 来自 VP8X 头嗅探 |
 | `animated` | 动画状态，仅在 `animation_known=true` 时有意义 |
 
+## 条码生成与解码
+
+```bash
+itb barcode generate qr 'https://example.com' code.png --format json
+itb barcode generate code128 ABC123 label.png --module-width 2 --module-height 80
+itb barcode decode code.png --symbology qr --symbology micro-qr --symbology rmqr --format json
+```
+
+生成支持 `qr/code128/code39/ean13/ean8`；`micro-qr/rmqr` 仅解码。输出为 PNG；已有文件需 `--force` 才替换。尺寸均使用整数像素，一维码默认绘制文字（`--no-draw-text` 关闭）。成功 JSON 分别为 `itb.barcode.generate.v1` 和 `itb.barcode.decode.v1`；失败沿用 `itb.error.v1`。完整默认值和限制见 `itb barcode generate --help` / `decode --help`。
+
 ## HTTP API（itb serve）
 
 除本地 CLI 外，`itb serve` 提供 `/api/v1` HTTP API，直接调用领域包而不执行 CLI 子进程。API 面向可信的个人 VPS 部署，不提供 WebUI、S3 管理、工作流或用户系统。

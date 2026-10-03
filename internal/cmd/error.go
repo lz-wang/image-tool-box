@@ -14,6 +14,7 @@ import (
 
 	"github.com/urfave/cli/v3"
 
+	"imagetoolbox/internal/barcode"
 	"imagetoolbox/internal/filehash"
 	"imagetoolbox/internal/s3"
 )
@@ -290,6 +291,18 @@ func classifyError(err error) MachineErrorInfo {
 			info.Retryable = m.retryable
 			return applyProviderDetail(err, info)
 		}
+	}
+
+	// Barcode domain errors use the existing stable error codes.
+	switch {
+	case errors.Is(err, barcode.ErrInvalidSymbology), errors.Is(err, barcode.ErrInvalidData), errors.Is(err, barcode.ErrInvalidOptions):
+		return MachineErrorInfo{Code: CodeInvalidArgument, Message: err.Error()}
+	case errors.Is(err, barcode.ErrTargetExists):
+		return MachineErrorInfo{Code: CodeTargetConflict, Message: err.Error()}
+	case errors.Is(err, barcode.ErrDecoderUnavailable):
+		return MachineErrorInfo{Code: CodeUnsupportedCapability, Message: err.Error()}
+	case errors.Is(err, barcode.ErrInvalidImage) && !errors.Is(err, fs.ErrNotExist):
+		return MachineErrorInfo{Code: CodeFileRead, Message: err.Error()}
 	}
 
 	// 本地文件系统错误：消息可安全携带本地路径
