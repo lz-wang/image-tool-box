@@ -39,6 +39,7 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed
 
+- stablefile 的快照清理测试改用每个测试独立临时目录，避免 `go test ./...` 并发运行 compress/S3 时将其他进程的活跃快照误判为泄漏。
 - CI 原有 MinIO 官方镜像不可拉取：改为从同一 release 的固定 commit `20960b6a2ddb9594ee418035b3c7c7fe92ae6a12` 构建临时、仅 loopback 的测试服务，保留真实领域/CLI 验收与失败门禁，并在 job 结束时清理服务。
 - **收尾 1** `fix(ci)`：MinIO 集成/CLI E2E 移至 Codecov 上传之前执行，`fail_ci_if_error` 降为 false——coverage 服务故障或受保护分支缺 token 不再阻断功能验证与构建矩阵。
 - **收尾 2** `fix(cli)` 补完 `itb.error.v1` 分类 taxonomy：Action 内参数错误（operand 数量、flag 组合冲突）引入 typed `InvalidArgumentError`，不再误报 `E_INTERNAL`；provider 限流错误码（SlowDown/Throttling 等）稳定映射 `E_THROTTLED`（`ErrorDetail` 新增 Throttled 标记，5xx 保持 `E_NETWORK` 可重试）；`InvalidAccessKeyId`/`SignatureDoesNotMatch`/`ExpiredToken` 及 HTTP 401 映射为 `E_INVALID_CREDENTIALS`（与"凭证未配置"、403 `E_ACCESS_DENIED` 区分）；`WrapError` 全分支以双 `%w` 保留原始 provider 错误链，保证 `provider_code`/`http_status` 可提取。

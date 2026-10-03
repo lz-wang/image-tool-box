@@ -9,7 +9,17 @@ import (
 	"imagetoolbox/internal/filehash"
 )
 
-// leftoverSnapshots 统计系统临时目录下当前存在的源快照。
+// isolateSnapshots prevents other package processes from being mistaken for
+// leaks when go test ./... runs them concurrently in the same system temp dir.
+func isolateSnapshots(t *testing.T) {
+	t.Helper()
+	dir := t.TempDir()
+	for _, name := range []string{"TMPDIR", "TMP", "TEMP"} {
+		t.Setenv(name, dir)
+	}
+}
+
+// leftoverSnapshots 统计当前测试独立临时目录下存在的源快照。
 func leftoverSnapshots(t *testing.T) map[string]bool {
 	t.Helper()
 
@@ -52,6 +62,7 @@ func openSource(t *testing.T, path string) (*os.File, os.FileInfo) {
 // TestSnapshotStableContent 稳定源：快照内容、摘要、size 一一对应，
 // 权限 0600，Open 可重新读取。
 func TestSnapshotStableContent(t *testing.T) {
+	isolateSnapshots(t)
 	before := leftoverSnapshots(t)
 	path := filepath.Join(t.TempDir(), "source.txt")
 	content := "hello stable world"
@@ -113,6 +124,7 @@ func TestSnapshotStableContent(t *testing.T) {
 // TestSnapshotDetectsChangedSource 快照期间源文件发生可观察变化时报
 // ErrSourceChanged 且不留快照残留。
 func TestSnapshotDetectsChangedSource(t *testing.T) {
+	isolateSnapshots(t)
 	before := leftoverSnapshots(t)
 	path := filepath.Join(t.TempDir(), "source.txt")
 	if err := os.WriteFile(path, []byte("original"), 0o644); err != nil {
@@ -139,6 +151,7 @@ func TestSnapshotDetectsChangedSource(t *testing.T) {
 // TestSnapshotFailureCleansUpOnCopyError 复制失败（源是目录）时同样
 // 清理快照。
 func TestSnapshotFailureCleansUpOnCopyError(t *testing.T) {
+	isolateSnapshots(t)
 	before := leftoverSnapshots(t)
 	dir := t.TempDir()
 
@@ -151,6 +164,7 @@ func TestSnapshotFailureCleansUpOnCopyError(t *testing.T) {
 
 // TestCloseIdempotent Close 幂等：二次 Close 不报错，快照文件被删除。
 func TestCloseIdempotent(t *testing.T) {
+	isolateSnapshots(t)
 	before := leftoverSnapshots(t)
 	path := filepath.Join(t.TempDir(), "source.txt")
 	if err := os.WriteFile(path, []byte("data"), 0o644); err != nil {
