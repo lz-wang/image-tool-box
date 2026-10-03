@@ -18,7 +18,7 @@
 
 CI 的 S3 验收通过 `scripts/start-ci-minio.sh` 从固定 MinIO release 源码构建临时测试服务；官方镜像不可用时仍执行真实集成测试与 CLI E2E，不依赖第三方镜像替代品。
 
-官方 Linux amd64 / arm64 构建的 `compress` 和条码解码原生工具要求 **glibc >= 2.28**；Go 实现的其他功能不在启动时强制检查此条件。Alpine Linux / musl 当前不受支持。
+官方 Linux amd64 / arm64 原生组件按项目的 **glibc 2.28 兼容基线**构建和验证；`compress` 压缩工具要求 glibc >= 2.28，条码 reader 则完全静态链接，不依赖动态 glibc 符号。Go 实现的其他功能不在启动时强制检查此条件。Alpine Linux / musl 当前不受支持。
 
 | 系统 | `compress` 支持情况 |
 |------|---------------------|
@@ -508,7 +508,7 @@ itb barcode generate code128 ABC123 label.png --module-width 2 --module-height 8
 itb barcode decode code.png --symbology qr --symbology micro-qr --symbology rmqr --format json
 ```
 
-生成支持 `qr/code128/code39/ean13/ean8`；`micro-qr/rmqr` 仅解码。生成使用纯 Go，目标必须为 `.png`，自动创建不存在的父目录，先写同目录临时文件再原子提交；已有文件需 `--force` 才替换，失败不留 partial。尺寸为整数像素，没有 DPI、毫米或系统字体依赖。
+生成支持 `qr/code128/code39/ean13/ean8`；`micro-qr/rmqr` 仅解码。生成使用纯 Go，目标必须为 `.png`，自动创建不存在的父目录，完整写入同目录临时文件后提交；默认原子 no-clobber，已有文件需 `--force` 才替换。强制替换在 Unix 上使用同目录原子 rename，Windows 不保证原子替换；失败会清理暂存文件，不留下 partial。尺寸为整数像素，没有 DPI、毫米或系统字体依赖。
 
 | 码制 | 生成输入 | 解码 |
 |------|----------|------|
@@ -530,7 +530,7 @@ itb barcode decode code.png --symbology qr --symbology micro-qr --symbology rmqr
 | `--module-width` | `2` | 一维码最窄模块的像素宽度 |
 | `--module-height` | `80` | 一维码条的像素高度，不含文字和留白 |
 | `--no-draw-text` | `false` | 关闭一维码下方的固定字体文字 |
-| `--force` | `false` | 原子替换已存在的生成目标 |
+| `--force` | `false` | 完整暂存后替换已有生成目标（Unix 原子替换，Windows 不保证原子性） |
 | `--symbology` | 全部七种 | decode 筛选，可重复；generate 的码制为 operand |
 | `--format` | `table` | CLI 成功输出：`table/json` |
 

@@ -261,6 +261,10 @@ func TestAtomicGeneration(t *testing.T) {
 	if _, err = GenerateFile(ctx, dst, o, false); !errors.Is(err, ErrTargetExists) {
 		t.Fatal(err)
 	}
+	afterConflict, err := os.ReadFile(dst)
+	if err != nil || !bytes.Equal(data, afterConflict) {
+		t.Fatal("no-clobber changed existing output", err)
+	}
 	cancelCtx, cancel := context.WithCancel(ctx)
 	cancel()
 	if _, err = GenerateFile(cancelCtx, dst, o, true); !errors.Is(err, context.Canceled) {
@@ -274,6 +278,13 @@ func TestAtomicGeneration(t *testing.T) {
 	if _, err = GenerateFile(ctx, dst, o, true); err != nil {
 		t.Fatal(err)
 	}
+	replacement, err := os.ReadFile(dst)
+	if err != nil || bytes.Equal(data, replacement) {
+		t.Fatal("force did not replace output", err)
+	}
+	if _, err := png.Decode(bytes.NewReader(replacement)); err != nil {
+		t.Fatal("force committed an incomplete PNG", err)
+	}
 	if _, err = GenerateFile(ctx, filepath.Join(dir, "bad.jpg"), o, false); err == nil {
 		t.Fatal("accepted non-PNG")
 	}
@@ -284,7 +295,7 @@ func TestAtomicGeneration(t *testing.T) {
 }
 
 func TestConcurrentNoClobber(t *testing.T) {
-	dst := filepath.Join(t.TempDir(), "code.png")
+	dst := filepath.Join(t.TempDir(), "codes", "nested", "code.png")
 	o := DefaultGenerateOptions()
 	o.Data = "race"
 	results := make(chan error, 8)
@@ -304,5 +315,47 @@ func TestConcurrentNoClobber(t *testing.T) {
 	}
 	if winners != 1 {
 		t.Fatalf("winners=%d", winners)
+	}
+	data, err := os.ReadFile(dst)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := png.Decode(bytes.NewReader(data)); err != nil {
+		t.Fatal("winning output is not a complete PNG", err)
+	}
+	entries, err := os.ReadDir(filepath.Dir(dst))
+	if err != nil || len(entries) != 1 {
+		t.Fatalf("concurrent generation left partial files: %v, %v", entries, err)
+	}
+}
+
+func TestGenerationCommitFailure(t *testing.T) {
+	// With force, a directory destination makes the final rename fail after staging.
+	for _, force := range []bool{false, true} {
+		t.Run(fmt.Sprintf("force=%t", force), func(t *testing.T) {
+			dir := t.TempDir()
+			dst := filepath.Join(dir, "code.png")
+			if err := os.Mkdir(dst, 0o755); err != nil {
+				t.Fatal(err)
+			}
+			marker := filepath.Join(dst, "existing")
+			if err := os.WriteFile(marker, []byte("preserve"), 0o600); err != nil {
+				t.Fatal(err)
+			}
+			o := DefaultGenerateOptions()
+			o.Data = "hello"
+			_, err := GenerateFile(context.Background(), dst, o, force)
+			if err == nil || (!force && !errors.Is(err, ErrTargetExists)) {
+				t.Fatalf("expected commit failure, got %v", err)
+			}
+			data, err := os.ReadFile(marker)
+			if err != nil || string(data) != "preserve" {
+				t.Fatal("failed commit changed existing destination", err)
+			}
+			entries, err := os.ReadDir(dir)
+			if err != nil || len(entries) != 1 {
+				t.Fatalf("failed commit left partial files: %v, %v", entries, err)
+			}
+		})
 	}
 }

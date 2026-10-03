@@ -22,10 +22,12 @@ func newBarcodeCommand() *cli.Command {
 DEFAULTS:
   QR: error correction M, module size 10, border 4.
   Linear: module width 2 px, bar height 80 px, text enabled;
-  ten-module horizontal quiet zones and 10 px vertical margins.
+  at least ten-module horizontal quiet zones and 10 px vertical margins.
 
 CONSTRAINTS:
-  Output must be PNG. Existing destinations require --force.
+  Output must be PNG. Missing parent directories are created.
+  Existing destinations require --force; Windows replacement is not guaranteed atomic.
+  Linear output widens to fit complete text with 10 px horizontal margins.
   micro-qr and rmqr are decode-only. Dimensions use integer pixels.
   Code39 is standard uppercase ASCII without checksum.
   Code128 accepts 1..80 ASCII characters. Generation is bounded
@@ -43,7 +45,7 @@ EXAMPLES:
 					&cli.IntFlag{Name: "module-width", Value: defaults.ModuleWidth, Usage: "Pixels per narrow linear module"},
 					&cli.IntFlag{Name: "module-height", Value: defaults.ModuleHeight, Usage: "Linear bar height in pixels"},
 					&cli.BoolFlag{Name: "no-draw-text", Usage: "Omit human-readable linear barcode text"},
-					&cli.BoolFlag{Name: "force", Usage: "Atomically replace an existing destination"},
+					&cli.BoolFlag{Name: "force", Usage: "Replace an existing destination after staging a complete PNG (atomic on Unix)"},
 					&cli.StringFlag{Name: "format", Value: "table", Usage: "Output format: table/json", Validator: enumValidator("format", "table", "json")},
 				}, Action: func(ctx context.Context, c *cli.Command) error {
 					return operationError("barcode.generate", runBarcodeGenerate(ctx, c))

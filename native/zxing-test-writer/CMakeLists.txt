@@ -17,12 +17,23 @@ else()
   include(FetchContent)
   FetchContent_Declare(zxing
     GIT_REPOSITORY https://github.com/zxing-cpp/zxing-cpp.git
-    GIT_TAG v3.1.1
-    GIT_SHALLOW TRUE
+    # ZXing-C++ v3.1.1, pinned to the immutable release commit.
+    GIT_TAG 287c85df6f961c8efbfb5ffd736cd9457b8b890e
+    GIT_SHALLOW FALSE
     GIT_SUBMODULES zint
     GIT_SUBMODULES_RECURSE FALSE
     SOURCE_SUBDIR core)
   FetchContent_MakeAvailable(zxing)
+  find_package(Git REQUIRED)
+  execute_process(
+    COMMAND "${GIT_EXECUTABLE}" -C "${zxing_SOURCE_DIR}/zint" rev-parse HEAD
+    RESULT_VARIABLE zint_result
+    OUTPUT_VARIABLE zint_revision
+    OUTPUT_STRIP_TRAILING_WHITESPACE)
+  # Match the submodule revision recorded by the pinned ZXing release.
+  if(NOT zint_result EQUAL 0 OR NOT zint_revision STREQUAL "55541e139e62b9209b71cd9b0ba9010cec28b1d9")
+    message(FATAL_ERROR "Unexpected Zint revision: ${zint_revision}")
+  endif()
 endif()
 add_executable(zxing-test-writer main.cpp)
 target_link_libraries(zxing-test-writer PRIVATE ZXing::ZXing)

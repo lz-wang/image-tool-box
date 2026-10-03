@@ -7,6 +7,11 @@ All notable changes to this project will be documented in this file.
 ### Fixed
 
 - 条码生成领域层明确校验 Code128 的 1..80 ASCII 字符限制，自动创建输出父目录，并在计划尺寸与 HTTP 准入中计入完整固定字体文字及水平留白，避免长数字 Code128 文字裁剪。`itb.barcode.generate.v1` 字段与版本不变；开启文字时部分输出宽度会增加。
+- 修正条码 `--force` 的跨平台说明：完整暂存后替换，Unix 同目录 rename 为原子操作，Windows 不保证原子性；同时澄清 Linux 压缩工具的 glibc 2.28 要求与完全静态链接 reader 的区别。
+
+### Changed
+
+- 两个原生 workflow 的六平台验收增加文件提交、并发 no-clobber、父目录创建、失败清理与 Code128 边界/文字尺寸测试；测试 writer 固定 ZXing-C++ v3.1.1 的不可变 commit，并校验 Zint submodule revision。
 
 ## [v0.10.0] - 2026-10-03
 

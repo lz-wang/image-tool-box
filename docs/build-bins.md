@@ -198,7 +198,9 @@ Go 将 JPEG/PNG/WebP 解码并归一化为 Gray8，stdin 私有协议为 `ITBZ` 
 
 ### 原生测试与 fixture
 
-两个 workflow 在六个平台的 helper 构建后强制执行 roundtrip、多码、旋转、反色、EXIF、Micro QR/rMQR、compiled CLI 和 HTTP 测试。Micro QR/rMQR 测试单独构建 `native/zxing-test-writer`，固定同版本 ZXing 的 `NEW` writer、experimental API 与上游固定 zint submodule；生成 PGM 像素后由 Go 测试转为临时 PNG，不签入二进制 fixture。
+两个 workflow 在六个平台的 helper 构建后强制执行 roundtrip、多码、旋转、反色、EXIF、Micro QR/rMQR、compiled CLI 和 HTTP 测试，同时执行文件替换、并发 no-clobber、父目录创建、失败清理以及 Code128 边界/完整文字尺寸测试。文件测试验证完整提交与失败保护；Unix 同目录 rename 为原子替换，Windows 不公开保证替换原子性。
+
+Micro QR/rMQR 测试单独构建 `native/zxing-test-writer`，启用 ZXing 的 `NEW` writer 与 experimental API。源码固定 v3.1.1 对应 commit `287c85df6f961c8efbfb5ffd736cd9457b8b890e`，并检查 Zint submodule 为 `55541e139e62b9209b71cd9b0ba9010cec28b1d9`；离线 `ZXING_SOURCE_DIR` 必须指向已核实的同一源码树。生成 PGM 像素后由 Go 测试转为临时 PNG，不签入二进制 fixture。
 
 测试 writer 只在 CI/本地验收阶段使用，绝不安装到 `bins/`、嵌入或发布。本地严格验收：
 
@@ -208,7 +210,7 @@ cmake --build /tmp/itb-zxing-test --parallel
 ITB_REQUIRE_BARCODE_NATIVE=1 \
 ITB_TEST_ZXING_READER="$PWD/bins/macos-arm64/zxing-reader" \
 ITB_TEST_ZXING_WRITER=/tmp/itb-zxing-test/zxing-test-writer \
-CGO_ENABLED=0 go test ./internal/barcode ./internal/cmd ./internal/httpapi -run '^(TestNative|TestBarcode)' -v
+CGO_ENABLED=0 go test ./internal/barcode ./internal/cmd ./internal/httpapi -run '^(TestNative|TestBarcode|TestAtomicGeneration|TestConcurrentNoClobber|TestGenerateCreatesParentDirectories|TestGenerationCommitFailure|TestCode128)' -v
 ```
 
 reader 路径与平台相符；Windows 的 reader/writer 路径均带 `.exe`，writer 位于 `Release/`。普通纯 Go 单测在 reader 缺失时只跳过原生测试；`ITB_REQUIRE_BARCODE_NATIVE=1` 使缺失 reader 或测试 writer 直接失败。

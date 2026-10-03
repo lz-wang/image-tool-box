@@ -18,7 +18,7 @@
 
 CI S3 acceptance uses `scripts/start-ci-minio.sh` to build a temporary test service from a fixed MinIO release source. Real integration and CLI E2E tests continue when official images are unavailable, without a third-party image replacement.
 
-The native tools for `compress` and barcode decoding in official Linux amd64 / arm64 builds require **glibc >= 2.28**. Other Go-implemented features are not rejected at startup when this requirement is absent. Alpine Linux / musl is not currently supported.
+Official Linux amd64 / arm64 native components are built and validated against the project's **glibc 2.28 compatibility baseline**. The `compress` tools require glibc >= 2.28; the barcode reader is fully statically linked and has no dynamic glibc symbol dependency. Other Go-implemented features are not rejected at startup when this requirement is absent. Alpine Linux / musl is not currently supported.
 
 | System | `compress` support |
 |--------|--------------------|
@@ -520,7 +520,7 @@ itb barcode generate code128 ABC123 label.png --module-width 2 --module-height 8
 itb barcode decode code.png --symbology qr --symbology micro-qr --symbology rmqr --format json
 ```
 
-Generation supports `qr/code128/code39/ean13/ean8`; `micro-qr/rmqr` are decode-only. Generation uses pure Go and requires a `.png` destination. Missing parent directories are created automatically. Output is staged in the destination directory and committed atomically; replacing an existing file requires `--force`, and failures leave no partial output. Dimensions use integer pixels, with no DPI, millimeter or system-font dependency.
+Generation supports `qr/code128/code39/ean13/ean8`; `micro-qr/rmqr` are decode-only. Generation uses pure Go and requires a `.png` destination. Missing parent directories are created automatically. A complete PNG is staged in the destination directory before committing, with atomic no-clobber by default. Replacing an existing file requires `--force`: same-directory rename is atomic on Unix, while Windows replacement is not guaranteed to be atomic. Failures clean up staged files and leave no partial output. Dimensions use integer pixels, with no DPI, millimeter or system-font dependency.
 
 | Symbology | Generation input | Decode |
 |------|----------|------|
@@ -542,7 +542,7 @@ Generation supports `qr/code128/code39/ean13/ean8`; `micro-qr/rmqr` are decode-o
 | `--module-width` | `2` | Narrowest linear module width in pixels |
 | `--module-height` | `80` | Linear bar height in pixels, excluding text and margins |
 | `--no-draw-text` | `false` | Omit fixed-font text below linear codes |
-| `--force` | `false` | Atomically replace an existing generation target |
+| `--force` | `false` | Replace an existing generation target after complete staging (atomic on Unix; not guaranteed on Windows) |
 | `--symbology` | All seven | Repeatable decode filter; generation uses an operand |
 | `--format` | `table` | CLI success output: `table/json` |
 

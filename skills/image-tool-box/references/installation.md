@@ -48,7 +48,7 @@ macOS/Linux 使用 `tar -xzf <归档名>`；归档中的目录为 `itb-<平台>-
 
 正式发行包只有 `itb` 可执行程序；压缩器和条码解码器已内嵌，首次使用时按需提取。运行时无需另装 pngquant、oxipng、libjpeg-turbo、Python、uv 或 ZXing。
 
-Linux 官方原生压缩与条码解码工具要求 **glibc ≥ 2.28**；Alpine/musl 当前不受支持。
+Linux 官方原生组件按 **glibc 2.28 兼容基线**构建和验证：压缩工具要求 glibc ≥ 2.28，条码 reader 完全静态链接，不依赖动态 glibc 符号。Alpine/musl 当前不受支持。
 
 ## 从源码构建
 

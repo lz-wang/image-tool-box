@@ -81,7 +81,7 @@ main.go ──→ internal/cmd（CLI）──→ 各领域包 (compress/resize/c
 - 生成 `qr/code128/code39/ean13/ean8`，Micro QR/rMQR 仅解码。纯 Go generator 固定 `boombuler/barcode v1.1.0`；PNG-only、整数像素，没有 DPI/mm 或系统字体行为。
 - QR 默认 M、module-size=10 px、border=4 modules，支持 L/M/Q/H。线性码 module-width=2 px、bar height=80 px、左右各 10 modules quiet zone、上下各 10 px；默认 `basicfont.Face7x13` 文字另占 20 px。Code39 大写标准字符集、无 checksum；EAN 接受 payload 或正确完整校验码，保留 `data` 并另报 `encoded_text`。
 - Code128 的 1..80 ASCII 字符限制由领域层校验。线性码计划宽度须容纳完整固定字体文字及左右各 10 px 留白，条码居中并保留至少十模块 quiet zone；HTTP 按完整输出计划准入。
-- `GeneratePlan` 在大画布分配前返回 Width/Height/WorkingBytes。`WriteFile` 自动创建父目录，PNG 写同目录临时文件；非 force 使用原子 no-clobber，force 原子替换，失败保留旧文件且无 partial。
+- `GeneratePlan` 在大画布分配前返回 Width/Height/WorkingBytes。`WriteFile` 自动创建父目录，PNG 完整写入同目录临时文件后提交；非 force 使用原子 no-clobber，force 使用 rename（Unix 原子替换，Windows 不保证原子性）。失败清理暂存文件，提交前失败保留旧文件。
 - `DecodeFile` 通过 `imageio.Probe` / `OpenStatic` 接受 JPEG/PNG/WebP，JPEG EXIF 归一化，Go 铺白并转 Gray8。七码制、多个结果与四点定位；相同文本不同位置不得按文本去重，未检出码是成功 `codes: []`。
 - ZXing-C++ 固定 v3.1.1，`native/zxing-reader` reader-only（无 writer/codec/path/network）。stdin 私有 ITBZ v1 Gray8 帧，stdout 内部严格 JSON；`exec.CommandContext` 跟随取消/超时，stdout/stderr 有界。Linux 固定 manylinux_2_28 完全静态链接，原 ABI allowlist 不放宽。
 - HTTP 生成 scalar → GeneratePlan → 输出尺寸/像素/工作集准入；解码 Probe → 输入尺寸/像素/工作集准入 → OpenStatic，禁止在准入前分配像素。decode JSON 的 path 是清洗后的客户端文件名，不能泄漏临时目录。

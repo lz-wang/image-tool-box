@@ -153,6 +153,7 @@ func GenerateFile(ctx context.Context, dst string, opts GenerateOptions, force b
 }
 
 // WriteFile commits a complete PNG. Without force, Link supplies atomic no-clobber.
+// Forced replacement uses same-directory Rename, which is atomic on Unix only.
 func (p Plan) WriteFile(ctx context.Context, dst string, force bool) (GenerateResult, error) {
 	if strings.ToLower(filepath.Ext(dst)) != ".png" {
 		return GenerateResult{}, fmt.Errorf("%w: output must have .png extension", ErrInvalidOptions)
