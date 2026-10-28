@@ -85,7 +85,7 @@ func validateImageSize(width, height int, cfg Config) error {
 }
 
 func compressImage(ctx context.Context, f form, dir string, _ Config) (string, string, int64, error) {
-	input, err := f.input("input", "quality")
+	input, err := f.input("quality")
 	if err != nil {
 		return "", "", 0, err
 	}
@@ -98,7 +98,7 @@ func compressImage(ctx context.Context, f form, dir string, _ Config) (string, s
 	return output, input.OriginalName, result.InputSize, err
 }
 func resizeImage(_ context.Context, f form, dir string, cfg Config) (string, string, int64, error) {
-	input, err := f.input("input", "width", "height", "percent", "mode", "anchor", "filter")
+	input, err := f.input("width", "height", "percent", "mode", "anchor", "filter")
 	if err != nil {
 		return "", "", 0, err
 	}
@@ -130,7 +130,7 @@ func resizeImage(_ context.Context, f form, dir string, cfg Config) (string, str
 	return output, name, fileSize(input.Path), err
 }
 func cropImage(_ context.Context, f form, dir string, _ Config) (string, string, int64, error) {
-	input, err := f.input("input", "anchor", "width", "height")
+	input, err := f.input("anchor", "width", "height")
 	if err != nil {
 		return "", "", 0, err
 	}
@@ -140,7 +140,7 @@ func cropImage(_ context.Context, f form, dir string, _ Config) (string, string,
 	return output, name, fileSize(input.Path), err
 }
 func rotateImage(_ context.Context, f form, dir string, cfg Config) (string, string, int64, error) {
-	input, err := f.input("input", "angle")
+	input, err := f.input("angle")
 	if err != nil {
 		return "", "", 0, err
 	}
@@ -176,7 +176,7 @@ func rotateImage(_ context.Context, f form, dir string, cfg Config) (string, str
 	return output, name, fileSize(input.Path), err
 }
 func convertImage(_ context.Context, f form, dir string, _ Config) (string, string, int64, error) {
-	input, err := f.input("input", "to", "quality", "lossless", "background")
+	input, err := f.input("to", "quality", "lossless", "background")
 	if err != nil {
 		return "", "", 0, err
 	}
@@ -199,7 +199,7 @@ func convertImage(_ context.Context, f form, dir string, _ Config) (string, stri
 	return output, name, fileSize(input.Path), err
 }
 func watermarkImage(_ context.Context, f form, dir string, cfg Config) (string, string, int64, error) {
-	input, err := f.input("input", "text", "image", "mode", "color", "space", "angle", "opacity", "font", "font-size", "position", "margin", "scale")
+	input, err := f.inputWithFiles([]string{"image", "font"}, "text", "mode", "color", "space", "angle", "opacity", "font-size", "position", "margin", "scale")
 	if err != nil {
 		return "", "", 0, err
 	}
@@ -309,7 +309,7 @@ func inspectHandler(cfg Config) http.HandlerFunc {
 			writeError(w, multipartErrorStatus(err), err)
 			return
 		}
-		input, err := f.input("input", "detail", "no-detail", "no-hash", "strict", "full-decode")
+		input, err := f.input("detail", "no-detail", "no-hash", "strict", "full-decode")
 		if err != nil {
 			writeError(w, http.StatusBadRequest, err)
 			return

@@ -39,6 +39,8 @@ curl --fail-with-body -X POST http://127.0.0.1:8080/api/v1/inspect \
 
 图片处理端点使用 `multipart/form-data`。`input` 是上传文件，选项通常沿用命令行长参数名，不带 `--`；HTTP `convert`、`grayscale` 另用 `to` 指定目标格式。没有本地路径 `output` 或 `in-place` 参数。
 
+严格区分字段类型：`input` 必须上传文件，水印的 `image`/`font` 是额外允许的文件字段；其余选项为标量。不要用 `levels=@file` 等形式传选项，或以本地路径字符串代替上传；错误类型返回 `400 invalid_argument`，不会套用默认值。
+
 图片结果是二进制，带 `Content-Disposition` 与 `X-ITB-*-Size` 响应头；检查和条码解码返回 JSON。保存响应后检查 HTTP 成功状态和实际文件类型，避免将错误响应当作图片。
 
 ## 灰度接口

@@ -12,6 +12,8 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed
 
+- HTTP Multipart 共享校验同时约束字段名与类型：`input` 必须是文件，只有水印接口显式允许 `image`/`font` 辅助上传，其余选项与条码生成字段均为标量。修复 `levels=@file` 等错误类型被当作缺省选项的问题，错误类型统一返回 `400 invalid_argument`。覆盖所有图片 API 的标量/文件错配、水印辅助文件正常上传，以及重复字段、未知字段和大小限制回归；HTTP JSON 错误结构保持不变。
+
 - CLI 共享映射将 `imageio.ErrUnsupportedFormat` 从 `E_INTERNAL` 修正为现有 `E_INVALID_ARGUMENT`，补齐 GIF/BMP/TIFF 的单 JSON 文档 E2E 断言。`itb.error.v1` 字段、版本及错误码集合不变。
 - 灰度 HTTP 非法输出 `to` 返回 `400 invalid_argument`，不支持的输入仍为 415。共享 `imageio.OutputError` 区分服务端输出创建、编码、关闭、提交故障，灰度原子提交、共享保存及上传存储路径保留该类型，HTTP 返回通用 500 而不泄漏内部路径；CLI 输出故障归为 `E_INTERNAL`。
 

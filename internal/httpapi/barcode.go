@@ -62,7 +62,7 @@ func barcodeHandler(cfg Config, generate bool) http.HandlerFunc {
 			serveFile(w, r, path, "barcode.png", 0, "barcode.generate")
 			return
 		}
-		input, err := f.input("input", "symbology")
+		input, err := f.input("symbology")
 		if err != nil {
 			writeError(w, 400, err)
 			return
@@ -102,11 +102,8 @@ func barcodeHandler(cfg Config, generate bool) http.HandlerFunc {
 }
 
 func barcodeGenerateOptions(f form) (barcode.GenerateOptions, error) {
-	if err := f.allowed("symbology", "data", "error-correction", "module-size", "border", "no-draw-text", "module-width", "module-height"); err != nil {
+	if err := f.allowed(nil, "symbology", "data", "error-correction", "module-size", "border", "no-draw-text", "module-width", "module-height"); err != nil {
 		return barcode.GenerateOptions{}, err
-	}
-	if len(f.files) != 0 {
-		return barcode.GenerateOptions{}, fmt.Errorf("generate accepts scalar fields only")
 	}
 	opts := barcode.DefaultGenerateOptions()
 	opts.Symbology = barcode.Symbology(f.values["symbology"])

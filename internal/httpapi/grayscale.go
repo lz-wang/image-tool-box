@@ -11,7 +11,7 @@ import (
 )
 
 func grayscaleImage(_ context.Context, f form, dir string, cfg Config) (string, string, int64, error) {
-	input, err := f.input("input", "levels", "dither", "background", "to", "quality", "lossless")
+	input, err := f.input("levels", "dither", "background", "to", "quality", "lossless")
 	if err != nil {
 		return "", "", 0, err
 	}

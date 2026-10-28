@@ -656,6 +656,8 @@ curl http://127.0.0.1:8080/api/v1/health
 
 Image endpoints accept `multipart/form-data` fields named after CLI long flags. Image results stream binary responses; inspect and barcode decoding return JSON. Barcode generation has no input upload. See the complete [API reference](docs/api.md) and [VPS deployment guide](docs/deployment.md).
 
+Multipart field types are strictly validated: `input` must be a file upload, and only the watermark endpoint accepts auxiliary `image` and `font` files. All other options (such as grayscale `levels`, `quality`, `dither` and `to`) must be scalar fields. Wrong types return `400 invalid_argument` instead of silently falling back to defaults. Barcode generation accepts scalar fields only.
+
 ```bash
 curl -H "Authorization: Bearer $ITB_API_TOKEN" \
   -F 'input=@photo.png' \

@@ -644,6 +644,8 @@ curl http://127.0.0.1:8080/api/v1/health
 
 图片处理端点使用与 CLI long flag 同名的 `multipart/form-data` 字段；图片结果以流式二进制响应返回，inspect 和条码解码返回 JSON。条码生成不上传 input。完整参数与部署说明见 [API 文档](docs/api.md) 和 [VPS 部署文档](docs/deployment.md)。
 
+Multipart 字段按类型严格校验：`input` 必须上传文件，只有水印接口的 `image` 和 `font` 可作为辅助文件；其余选项（如灰度的 `levels`、`quality`、`dither`、`to`）必须为标量。错误类型返回 `400 invalid_argument`，不会静默回退为默认值。条码生成仅接受标量字段。
+
 ```bash
 curl -H "Authorization: Bearer $ITB_API_TOKEN" \
   -F 'input=@photo.png' \

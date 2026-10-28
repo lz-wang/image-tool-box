@@ -128,8 +128,15 @@ func sanitizeFilename(name string) string {
 	return strings.TrimLeft(filepath.Base(name), ".")
 }
 
-func (f form) input(allowed ...string) (uploadedFile, error) {
-	if err := f.allowed(allowed...); err != nil {
+// input requires an uploaded input file and accepts only scalar option fields.
+func (f form) input(scalarFields ...string) (uploadedFile, error) {
+	return f.inputWithFiles(nil, scalarFields...)
+}
+
+// inputWithFiles explicitly declares auxiliary uploads, such as watermark image
+// and font. Every other allowed field must be scalar, even when left empty.
+func (f form) inputWithFiles(fileFields []string, scalarFields ...string) (uploadedFile, error) {
+	if err := f.allowed(append([]string{"input"}, fileFields...), scalarFields...); err != nil {
 		return uploadedFile{}, err
 	}
 	file := f.files["input"]
@@ -143,19 +150,33 @@ func (f form) input(allowed ...string) (uploadedFile, error) {
 func (f form) file(name string) string {
 	return f.files[name].Path
 }
-func (f form) allowed(names ...string) error {
-	ok := map[string]bool{}
-	for _, name := range names {
-		ok[name] = true
+
+// allowed validates both names and transport types. A map entry is true for a
+// file field, false for a scalar; absent entries are unknown parameters.
+func (f form) allowed(fileFields []string, scalarFields ...string) error {
+	fields := map[string]bool{}
+	for _, name := range scalarFields {
+		fields[name] = false
+	}
+	for _, name := range fileFields {
+		fields[name] = true
 	}
 	for name := range f.values {
-		if !ok[name] {
+		isFile, ok := fields[name]
+		if !ok {
 			return fmt.Errorf("unknown parameter: %s", name)
+		}
+		if isFile {
+			return fmt.Errorf("parameter %s must be a file", name)
 		}
 	}
 	for name := range f.files {
-		if !ok[name] {
+		isFile, ok := fields[name]
+		if !ok {
 			return fmt.Errorf("unknown parameter: %s", name)
+		}
+		if !isFile {
+			return fmt.Errorf("parameter %s must be a scalar", name)
 		}
 	}
 	return nil

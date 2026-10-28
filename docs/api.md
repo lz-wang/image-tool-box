@@ -9,6 +9,8 @@ Every operation uses `multipart/form-data`. `input` is the required source image
 
 Scalar fields are limited to 4 KiB (16 KiB for `text`); an oversized field is rejected with `413 payload_too_large`. Uploaded files are stored under server-generated temporary names — client filenames are only used for download names — so identical filenames for `input` and `image` never collide.
 
+Field types are part of the multipart contract. `input` must be a file upload. Only `watermark` additionally allows uploaded `image` and `font` files; every other option is scalar. For example, `levels=@payload.txt`, a file-valued `quality`/`background`/`dither`/`to`, or a scalar `input`/watermark `image`/`font` returns `400 invalid_argument`. Wrong types are never treated as omitted options. Barcode generation accepts no file fields. Duplicate/unknown field rejection and request/field size limits still apply.
+
 ## Operations
 
 | Endpoint | Multipart fields |
