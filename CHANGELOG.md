@@ -12,6 +12,8 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed
 
+- 灰度转换移除无条件 `chmod 0644`：Unix 新输出使用私有临时文件权限（0600 受 umask 限制），替换已有普通目标时保留其权限；符号链接替换保持私有权限，不继承或修改其目标。增加隔离子进程 umask 077、0600/0400/0640 覆盖及失败回滚测试。
+
 - 灰度 CLI/API 对显式传入的 `levels=0`、`quality=0` 返回参数错误，HTTP 空值同样拒绝；省略参数与领域 `Options{}` 仍使用 256 灰阶和质量 90。两种 adapter 共用领域数值校验，修复 HTTP `quality=0` 被默认化的不一致。
 
 - 灰度输出采用同目录临时文件完整编码、同步、关闭后替换，拒绝输入别名，编码或提交前失败保留已有目标并清理暂存文件。

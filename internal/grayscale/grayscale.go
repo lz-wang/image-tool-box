@@ -74,6 +74,8 @@ func pixel(src image.Image, x, y int) color.NRGBA {
 // ConvertFile decodes JPEG/PNG/WebP with EXIF normalization and commits a fully
 // encoded temporary file. Existing destinations survive all pre-commit failures.
 // PNG is Gray8; JPEG/WebP promise grayscale pixels, not a single-channel codec.
+// New files keep CreateTemp's private permissions (0600 before umask on Unix);
+// replacement of an existing regular file preserves its permission bits.
 func ConvertFile(inputPath, outputPath string, opts Options) error {
 	opts.Normalize()
 	if err := opts.Validate(); err != nil {
@@ -119,7 +121,16 @@ func commitFile(inputPath, outputPath string, encode func(io.Writer) error) erro
 	if err := encode(tmp); err != nil {
 		return err
 	}
-	if err := tmp.Chmod(0o644); err != nil {
+	// Only an existing regular destination supplies permissions. New files and
+	// replacements of symlinks retain the private CreateTemp mode. Lstat avoids
+	// inheriting permissions from a symlink's unrelated target.
+	if stat, err := os.Lstat(outputPath); err == nil {
+		if stat.Mode().IsRegular() {
+			if err := tmp.Chmod(stat.Mode().Perm()); err != nil {
+				return err
+			}
+		}
+	} else if !os.IsNotExist(err) {
 		return err
 	}
 	if err := tmp.Sync(); err != nil {
