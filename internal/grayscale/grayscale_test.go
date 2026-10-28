@@ -131,7 +131,7 @@ func TestConvertFile(t *testing.T) {
 }
 
 func TestInvalidOptions(t *testing.T) {
-	for _, opts := range []Options{{Levels: 3}, {Quality: -1}, {Quality: 101}, {Background: "oops"}, {Background: "#00000000"}} {
+	for _, opts := range []Options{{Levels: 3}, {Dither: "bad"}, {Dither: DitherFS}, {Quality: -1}, {Quality: 101}, {Background: "oops"}, {Background: "#00000000"}} {
 		if _, err := Apply(image.NewGray(image.Rect(0, 0, 1, 1)), opts); err == nil {
 			t.Fatalf("accepted %+v", opts)
 		}

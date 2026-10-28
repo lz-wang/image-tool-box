@@ -40,6 +40,7 @@ func Apply(src image.Image, opts Options) (*image.Gray, error) {
 			dst.Pix[y*dst.Stride+x] = uint8(math.Round(0.299*r + 0.587*g + 0.114*b))
 		}
 	}
+	dither(dst, opts)
 	return dst, nil
 }
 
@@ -56,7 +57,7 @@ func ConvertFile(inputPath, outputPath string, opts Options) error {
 		return err
 	}
 	if opts.Lossless && format == imageio.FormatJPEG {
-		return fmt.Errorf("lossless is only supported for png and webp")
+		return fmt.Errorf("%w: lossless is only supported for png and webp", ErrInvalidOptions)
 	}
 	if err := imageio.RejectSameFile(inputPath, outputPath); err != nil {
 		return err
