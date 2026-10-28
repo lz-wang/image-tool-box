@@ -285,6 +285,33 @@ Conversion semantics are fixed per target format:
 
 </details>
 
+## Grayscale conversion
+
+`grayscale <src> [dst]` converts JPEG/PNG/WebP to opaque grayscale, applying JPEG EXIF orientation before background compositing, BT.601-style luma calculation and quantization. Dimensions stay unchanged. Output must not alias the input file.
+
+```bash
+itb grayscale photo.jpg
+itb grayscale --levels 16 --dither fs photo.jpg eink.png
+itb grayscale --levels 4 --dither ordered photo.png output.png
+itb grayscale --background "#FFFFFF" transparent.webp output.png
+itb resize --width 800 photo.jpg resized.png
+itb grayscale --levels 16 --dither fs resized.png eink.png
+```
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `[dst]` | `<name>_grayscale.png` | Output path; extension determines PNG/JPEG/WebP encoding |
+| `--levels` | `256` | `2` / `4` / `16` / `256` gray levels |
+| `--dither` | `none` | `none` / `fs` (serpentine Floyd–Steinberg) / `ordered` (4×4 Bayer); dithering requires fewer than 256 levels |
+| `--background` | `#FFFFFF` | Opaque compositing background for every output format; accepts `#RGB` / `#RRGGBB` / `#RRGGBBAA` |
+| `-q, --quality` | `90` | JPEG/lossy WebP quality, 1–100; encoding effort for lossless WebP, ignored for PNG |
+| `--lossless` | `false` | Use lossless WebP; PNG is always lossless, JPEG rejects this flag |
+| `--format` | `text` | `text` / `json`; controls failures only, success remains text; errors use existing `itb.error.v1` |
+
+PNG always uses single-channel Gray8: `--levels 16` restricts pixel values to 16 levels, without Gray4 packing. JPEG/WebP do not promise single-channel encoding, and lossy encoding may change quantized values; use PNG or lossless WebP to preserve the exact levels. Output is fully staged in the destination directory before replacement, preserving existing targets on pre-commit failures; Unix rename replacement is atomic, Windows does not guarantee atomicity.
+
+For e-ink photos, try 16 levels + FS; try no dithering for text/comics. Resize before dithering so interpolation does not alter the discrete gray distribution, and check results on the target device. Defaults are 256 levels without dithering. Device profiles, brightness/contrast enhancement and hardware pixel packing are outside this command's scope.
+
 ## Watermark
 
 Add text or image watermarks to images; text watermarks support two modes — position (single point) and repeated tile — while image watermarks support the position mode only. For image watermarks, `<dst>` must not alias the file passed to `--image`.

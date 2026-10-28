@@ -84,6 +84,8 @@ func TestInferOperationPath(t *testing.T) {
 		{[]string{"itb", "inspect", "--format=json", "a.png"}, "inspect"},
 		{[]string{"itb", "--bad-flag"}, ""},
 		{[]string{"itb"}, ""},
+		{nil, ""},
+		{[]string{"/tmp/itb", "grayscale", "--quality", "0"}, "grayscale"},
 	}
 	for _, tt := range tests {
 		if got := inferOperationPath(testApp(), tt.args); got != tt.want {
@@ -211,8 +213,8 @@ func TestWriteMachineErrorShape(t *testing.T) {
 		SchemaVersion: MachineErrorSchemaVersion,
 		Operation:     "s3.download",
 		Error: MachineErrorInfo{
-			Code:     CodeChecksumMismatch,
-			Message:  "Downloaded content does not match the expected SHA-256",
+			Code:      CodeChecksumMismatch,
+			Message:   "Downloaded content does not match the expected SHA-256",
 			Retryable: false,
 		},
 	})

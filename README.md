@@ -283,6 +283,33 @@ brew install lz-wang/tap/itb
 
 </details>
 
+## 灰度转换
+
+`grayscale <src> [dst]` 将 JPEG/PNG/WebP 转为不透明灰度图，先应用 JPEG EXIF 方向，再合成背景、计算 BT.601 风格 luma 并量化。尺寸保持不变，输入输出不能指向同一实际文件。
+
+```bash
+itb grayscale photo.jpg
+itb grayscale --levels 16 --dither fs photo.jpg eink.png
+itb grayscale --levels 4 --dither ordered photo.png output.png
+itb grayscale --background "#FFFFFF" transparent.webp output.png
+itb resize --width 800 photo.jpg resized.png
+itb grayscale --levels 16 --dither fs resized.png eink.png
+```
+
+| 参数 | 默认值 | 说明 |
+|------|--------|------|
+| `[dst]` | `<name>_grayscale.png` | 输出路径；扩展名决定 PNG/JPEG/WebP 编码 |
+| `--levels` | `256` | `2` / `4` / `16` / `256` 个灰阶 |
+| `--dither` | `none` | `none` / `fs`（蛇形 Floyd–Steinberg）/ `ordered`（Bayer 4×4）；抖动要求灰阶少于 256 |
+| `--background` | `#FFFFFF` | 所有输出格式均先合成此不透明背景，支持 `#RGB` / `#RRGGBB` / `#RRGGBBAA` |
+| `-q, --quality` | `90` | JPEG/有损 WebP 质量，范围 1–100；无损 WebP 为编码努力程度，PNG 忽略 |
+| `--lossless` | `false` | 启用无损 WebP；PNG 始终无损，JPEG 不接受此开关 |
+| `--format` | `text` | `text` / `json`；只控制失败输出，成功仍为文本，错误 JSON 使用现有 `itb.error.v1` |
+
+PNG 固定输出 Gray8 单通道，`--levels 16` 表示仅使用 16 个灰度值，不是 Gray4 打包。JPEG/WebP 不承诺单通道编码，有损编码也可能改变离散灰度值；需要精确保留灰阶时使用 PNG 或无损 WebP。输出先在同目录完整暂存后替换，提交前失败保留旧目标；Unix rename 原子替换，Windows 不保证原子性。
+
+墨水屏照片可先试 16 灰阶 + FS，文字/漫画先试不抖动。先缩放、后抖动，避免插值破坏灰阶分布；最终效果需在目标设备检查。默认 256 灰阶无抖动。不提供设备 Profile、亮度/对比度增强或硬件像素打包。
+
 ## 图像水印
 
 为图片添加文字或图片水印；文字水印支持两种模式：位置水印（单点）和重复平铺水印，图片水印仅支持位置水印。图片水印模式下，`<dst>` 也不得与 `--image` 指向同一文件。

@@ -16,6 +16,7 @@ import (
 
 	"imagetoolbox/internal/barcode"
 	"imagetoolbox/internal/filehash"
+	"imagetoolbox/internal/grayscale"
 	"imagetoolbox/internal/s3"
 )
 
@@ -188,9 +189,13 @@ const versionUnknown = "dev"
 // inferOperationPath 沿 argv 走命令树，返回点分路径（如 "s3.list"）。
 // 非命令 token（operand/flag）终止推断；无法识别时返回空串。
 func inferOperationPath(app *cli.Command, args []string) string {
+	if len(args) == 0 {
+		return ""
+	}
 	cur := app
 	var path []string
-	for _, arg := range args {
+	// argv[0] may be an absolute executable path in compiled CLI invocations.
+	for _, arg := range args[1:] {
 		if arg == app.Name {
 			continue
 		}
@@ -295,6 +300,8 @@ func classifyError(err error) MachineErrorInfo {
 
 	// Barcode domain errors use the existing stable error codes.
 	switch {
+	case errors.Is(err, grayscale.ErrInvalidOptions):
+		return MachineErrorInfo{Code: CodeInvalidArgument, Message: err.Error()}
 	case errors.Is(err, barcode.ErrInvalidSymbology), errors.Is(err, barcode.ErrInvalidData), errors.Is(err, barcode.ErrInvalidOptions):
 		return MachineErrorInfo{Code: CodeInvalidArgument, Message: err.Error()}
 	case errors.Is(err, barcode.ErrTargetExists):
