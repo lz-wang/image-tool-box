@@ -308,6 +308,8 @@ itb grayscale --levels 16 --dither fs resized.png eink.png
 | `--lossless` | `false` | Use lossless WebP; PNG is always lossless, JPEG rejects this flag |
 | `--format` | `text` | `text` / `json`; controls failures only, success remains text; errors use existing `itb.error.v1` |
 
+Defaults apply only when parameters are omitted; explicitly supplying `levels=0` or `quality=0` through CLI/API returns an argument error.
+
 PNG always uses single-channel Gray8: `--levels 16` restricts pixel values to 16 levels, without Gray4 packing. JPEG/WebP do not promise single-channel encoding, and lossy encoding may change quantized values; use PNG or lossless WebP to preserve the exact levels. Output is fully staged in the destination directory before replacement, preserving existing targets on pre-commit failures; Unix rename replacement is atomic, Windows does not guarantee atomicity.
 
 For e-ink photos, try 16 levels + FS; try no dithering for text/comics. Resize before dithering so interpolation does not alter the discrete gray distribution, and check results on the target device. Defaults are 256 levels without dithering. Device profiles, brightness/contrast enhancement and hardware pixel packing are outside this command's scope.

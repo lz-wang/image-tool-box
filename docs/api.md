@@ -40,6 +40,8 @@ Unknown fields, duplicate fields, and legacy `file`, `watermark`, or `options` f
 
 ### Grayscale conversion
 
+Omitted `levels` and `quality` use their domain defaults (256 and 90). Explicit `0` or an empty value for either field returns `400 invalid_argument`, matching the CLI's rejection of zero values. Direct domain callers can still use `Options{}` to request defaults.
+
 `grayscale` accepts JPEG/PNG/WebP with JPEG EXIF normalization, keeps dimensions unchanged and returns opaque grayscale pixels. Defaults: `levels=256`, `dither=none`, `background=#FFFFFF`, `to=png`, `quality=90`, `lossless=false`. `levels` is an integer (`2`/`4`/`16`/`256`); `dither` is `none`, serpentine `fs`, or 4×4 Bayer `ordered`. Dithering requires fewer than 256 levels. Background is composited before luma conversion for **all** output formats and must be opaque. Unlike convert, grayscale does not preserve alpha.
 
 `to` is transport-only (`png`/`jpg`/`jpeg`/`webp`); the domain derives encoding from the adapter's output path. PNG is single-channel Gray8 even with 2/4/16 levels; JPEG/WebP do not promise a single-channel file. Lossy encoding may alter the discrete levels. `quality` accepts 1–100, is ignored for PNG and controls effort for lossless WebP. `lossless=true` is accepted for PNG/WebP and rejected for JPEG. The attachment name defaults to `<name>_grayscale.png`. HTTP has no `format` field and returns existing structured HTTP errors.

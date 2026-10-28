@@ -53,9 +53,11 @@ func TestGrayscaleBinaryE2E(t *testing.T) {
 	}{
 		{"missing", []string{"missing.png"}, CodeFileNotFound},
 		{"levels", []string{"--levels", "3", src}, CodeInvalidArgument},
+		{"levels zero", []string{"--levels", "0", src}, CodeInvalidArgument},
 		{"dither", []string{"--dither", "fs", src}, CodeInvalidArgument},
 		{"background", []string{"--background", "#00000000", src}, CodeInvalidArgument},
 		{"quality", []string{"--quality", "0", src}, CodeInvalidArgument},
+		{"quality above range", []string{"--quality", "101", src}, CodeInvalidArgument},
 		{"lossless jpeg", []string{"--lossless", src, "out.jpg"}, CodeInvalidArgument},
 		{"operands", nil, CodeInvalidArgument},
 	} {

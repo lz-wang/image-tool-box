@@ -12,6 +12,8 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed
 
+- 灰度 CLI/API 对显式传入的 `levels=0`、`quality=0` 返回参数错误，HTTP 空值同样拒绝；省略参数与领域 `Options{}` 仍使用 256 灰阶和质量 90。两种 adapter 共用领域数值校验，修复 HTTP `quality=0` 被默认化的不一致。
+
 - 灰度输出采用同目录临时文件完整编码、同步、关闭后替换，拒绝输入别名，编码或提交前失败保留已有目标并清理暂存文件。
 - 修复编译后二进制通过绝对路径运行时，flag 解析失败的 `itb.error.v1.operation` 为空；现在跳过 argv[0] 后识别命令名。
 

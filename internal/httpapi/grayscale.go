@@ -23,6 +23,16 @@ func grayscaleImage(_ context.Context, f form, dir string, cfg Config) (string, 
 	if err != nil {
 		return "", "", 0, err
 	}
+	if _, supplied := f.values["levels"]; supplied {
+		if err := grayscale.ValidateLevels(levels); err != nil {
+			return "", "", 0, err
+		}
+	}
+	if _, supplied := f.values["quality"]; supplied {
+		if err := grayscale.ValidateQuality(quality); err != nil {
+			return "", "", 0, err
+		}
+	}
 	lossless, err := f.bool("lossless")
 	if err != nil {
 		return "", "", 0, err

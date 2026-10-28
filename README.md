@@ -306,6 +306,8 @@ itb grayscale --levels 16 --dither fs resized.png eink.png
 | `--lossless` | `false` | 启用无损 WebP；PNG 始终无损，JPEG 不接受此开关 |
 | `--format` | `text` | `text` / `json`；只控制失败输出，成功仍为文本，错误 JSON 使用现有 `itb.error.v1` |
 
+只有省略参数时才应用默认值；CLI/API 显式传入 `levels=0` 或 `quality=0` 会报参数错误。
+
 PNG 固定输出 Gray8 单通道，`--levels 16` 表示仅使用 16 个灰度值，不是 Gray4 打包。JPEG/WebP 不承诺单通道编码，有损编码也可能改变离散灰度值；需要精确保留灰阶时使用 PNG 或无损 WebP。输出先在同目录完整暂存后替换，提交前失败保留旧目标；Unix rename 原子替换，Windows 不保证原子性。
 
 墨水屏照片可先试 16 灰阶 + FS，文字/漫画先试不抖动。先缩放、后抖动，避免插值破坏灰阶分布；最终效果需在目标设备检查。默认 256 灰阶无抖动。不提供设备 Profile、亮度/对比度增强或硬件像素打包。

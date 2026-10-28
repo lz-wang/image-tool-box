@@ -41,10 +41,10 @@ EXAMPLES:
   itb grayscale --levels 4 --dither ordered photo.png output.png
   itb grayscale --background "#FFFFFF" photo.webp output.png`,
 		Flags: []cli.Flag{
-			&cli.IntFlag{Name: "levels", Value: grayscale.DefaultLevels, Usage: "Number of gray levels: 2/4/16/256"},
+			&cli.IntFlag{Name: "levels", Value: grayscale.DefaultLevels, Usage: "Number of gray levels: 2/4/16/256", Validator: grayscale.ValidateLevels},
 			&cli.StringFlag{Name: "dither", Value: string(grayscale.DitherNone), Usage: "Dither algorithm: none/fs/ordered"},
 			&cli.StringFlag{Name: "background", Value: grayscale.DefaultBackground, Usage: "Opaque alpha-compositing background COLOR"},
-			&cli.IntFlag{Name: "quality", Aliases: []string{"q"}, Value: grayscale.DefaultQuality, Usage: "JPEG/WebP quality (1-100); effort for lossless WebP; ignored for PNG", Validator: intRangeValidator("quality", 1, 100)},
+			&cli.IntFlag{Name: "quality", Aliases: []string{"q"}, Value: grayscale.DefaultQuality, Usage: "JPEG/WebP quality (1-100); effort for lossless WebP; ignored for PNG", Validator: grayscale.ValidateQuality},
 			&cli.BoolFlag{Name: "lossless", Usage: "Use lossless WebP encoding; PNG is always lossless"},
 			&cli.StringFlag{Name: "format", Value: "text", Usage: "Error output format: text/json (success remains text)", Validator: enumValidator("format", "text", "json")},
 		},

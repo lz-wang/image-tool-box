@@ -34,13 +34,18 @@ func TestGrayscaleHTTP(t *testing.T) {
 		want   int
 	}{
 		{"defaults", nil, Config{NoAuth: true}, 200},
+		{"explicit defaults", map[string]string{"levels": "256", "quality": "90"}, Config{NoAuth: true}, 200},
 		{"FS", map[string]string{"levels": "16", "dither": "fs"}, Config{NoAuth: true}, 200},
 		{"ordered", map[string]string{"levels": "4", "dither": "ordered"}, Config{NoAuth: true}, 200},
 		{"jpeg", map[string]string{"to": "jpg"}, Config{NoAuth: true}, 200},
 		{"webp", map[string]string{"to": "webp", "lossless": "true"}, Config{NoAuth: true}, 200},
 		{"levels", map[string]string{"levels": "3"}, Config{NoAuth: true}, 400},
+		{"levels zero", map[string]string{"levels": "0"}, Config{NoAuth: true}, 400},
+		{"levels empty", map[string]string{"levels": ""}, Config{NoAuth: true}, 400},
 		{"number", map[string]string{"levels": "x"}, Config{NoAuth: true}, 400},
 		{"quality", map[string]string{"quality": "101"}, Config{NoAuth: true}, 400},
+		{"quality zero", map[string]string{"quality": "0"}, Config{NoAuth: true}, 400},
+		{"quality empty", map[string]string{"quality": ""}, Config{NoAuth: true}, 400},
 		{"background", map[string]string{"background": "#00000000"}, Config{NoAuth: true}, 400},
 		{"dither", map[string]string{"dither": "fs"}, Config{NoAuth: true}, 400},
 		{"lossless jpeg", map[string]string{"to": "jpeg", "lossless": "true"}, Config{NoAuth: true}, 400},
@@ -61,6 +66,9 @@ func TestGrayscaleHTTP(t *testing.T) {
 				t.Fatal(w.Body.String())
 			}
 			if tc.want != 200 {
+				if tc.want == 400 && decodeJSONError(t, w.Body.Bytes()) != "invalid_argument" {
+					t.Fatal(w.Body.String())
+				}
 				return
 			}
 			if w.Header().Get("X-ITB-Operation") != "grayscale" || w.Header().Get("X-ITB-Input-Size") == "" || w.Header().Get("X-ITB-Output-Size") == "" {
@@ -69,23 +77,24 @@ func TestGrayscaleHTTP(t *testing.T) {
 			if !strings.Contains(w.Header().Get("Content-Disposition"), "photo_grayscale.") {
 				t.Fatal(w.Header())
 			}
-			if tc.fields["to"] != "" {
-				return
-			}
-			img, err := png.Decode(bytes.NewReader(w.Body.Bytes()))
-			if err != nil {
-				t.Fatal(err)
-			}
-			if _, ok := img.(*image.Gray); !ok {
-				t.Fatalf("not Gray8: %T", img)
+			ext := tc.fields["to"]
+			if ext == "" {
+				ext = "png"
+				img, err := png.Decode(bytes.NewReader(w.Body.Bytes()))
+				if err != nil {
+					t.Fatal(err)
+				}
+				if _, ok := img.(*image.Gray); !ok {
+					t.Fatalf("not Gray8: %T", img)
+				}
 			}
 			dir := t.TempDir()
 			src := filepath.Join(dir, "input.png")
-			dst := filepath.Join(dir, "out.png")
+			dst := filepath.Join(dir, "out."+ext)
 			if err := os.WriteFile(src, input.content, 0o600); err != nil {
 				t.Fatal(err)
 			}
-			opts := grayscale.Options{}
+			opts := grayscale.Options{Lossless: tc.fields["lossless"] == "true"}
 			if tc.name == "FS" {
 				opts.Levels = 16
 				opts.Dither = grayscale.DitherFS
