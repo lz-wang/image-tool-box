@@ -5,7 +5,7 @@ It is not a remote shell: S3 management, workflows, user management, queues, and
 
 All image operations require `Authorization: Bearer $ITB_API_TOKEN`. `GET /api/v1/health` does not require authentication and returns `{"status":"ok"}`.
 
-Every operation uses `multipart/form-data`. `input` is the required source image file except for barcode generation, which accepts scalar fields only. Except for the transport-only `convert` field `to`, operation option names match the corresponding CLI long flag. Image-transforming endpoints stream binary downloads with `Content-Disposition`, `X-ITB-Input-Size`, `X-ITB-Output-Size`, and `X-ITB-Operation` headers. `inspect` and barcode decoding return JSON.
+Every operation uses `multipart/form-data`. `input` is the required source image file except for barcode generation, which accepts scalar fields only. Except for the transport-only `convert` and `grayscale` field `to`, operation option names match the corresponding CLI long flag. Image-transforming endpoints stream binary downloads with `Content-Disposition`, `X-ITB-Input-Size`, `X-ITB-Output-Size`, and `X-ITB-Operation` headers. `inspect` and barcode decoding return JSON.
 
 Scalar fields are limited to 4 KiB (16 KiB for `text`); an oversized field is rejected with `413 payload_too_large`. Uploaded files are stored under server-generated temporary names — client filenames are only used for download names — so identical filenames for `input` and `image` never collide.
 
@@ -18,6 +18,7 @@ Scalar fields are limited to 4 KiB (16 KiB for `text`); an oversized field is re
 | `POST /api/v1/crop` | `input`, `anchor`, `width`, `height` |
 | `POST /api/v1/rotate` | `input`, `angle` |
 | `POST /api/v1/convert` | `input`, `to`, `quality`, `lossless`, `background` |
+| `POST /api/v1/grayscale` | `input`, `levels`, `dither`, `background`, `to`, `quality`, `lossless` |
 | `POST /api/v1/watermark` | `input`, `text`, `image`, `mode`, `color`, `space`, `angle`, `opacity`, `font`, `font-size`, `position`, `margin`, `scale` |
 | `POST /api/v1/inspect` | `input`, `detail`, `no-detail`, `no-hash`, `strict`, `full-decode` |
 | `POST /api/v1/barcode/generate` | `symbology`, `data`, `error-correction`, `module-size`, `border`, `module-width`, `module-height`, `no-draw-text` (no file upload) |
@@ -36,6 +37,20 @@ For `resize`, `filter` accepts `nearest`, `linear`, `mitchell`, `catmullrom`, or
 `rotate` rotates by a floating-point `angle` in degrees: positive = counter-clockwise, negative = clockwise, range `(-360, 360)`, never `0`. Exact `90/180/270` are interpolation-free; arbitrary angles adjust the output canvas as needed (uncovered areas stay transparent for PNG/WebP and flatten onto white for JPEG). The planned output dimensions are admitted before allocation, so an angle that would expand a valid input beyond the limits returns `413 image_too_large`. The rotate working set (an NRGBA source copy plus the output canvas for arbitrary angles) is admitted against `--max-working-bytes` before allocation as well.
 
 Unknown fields, duplicate fields, and legacy `file`, `watermark`, or `options` fields return `400`; they are not silently ignored.
+
+### Grayscale conversion
+
+`grayscale` accepts JPEG/PNG/WebP with JPEG EXIF normalization, keeps dimensions unchanged and returns opaque grayscale pixels. Defaults: `levels=256`, `dither=none`, `background=#FFFFFF`, `to=png`, `quality=90`, `lossless=false`. `levels` is an integer (`2`/`4`/`16`/`256`); `dither` is `none`, serpentine `fs`, or 4×4 Bayer `ordered`. Dithering requires fewer than 256 levels. Background is composited before luma conversion for **all** output formats and must be opaque. Unlike convert, grayscale does not preserve alpha.
+
+`to` is transport-only (`png`/`jpg`/`jpeg`/`webp`); the domain derives encoding from the adapter's output path. PNG is single-channel Gray8 even with 2/4/16 levels; JPEG/WebP do not promise a single-channel file. Lossy encoding may alter the discrete levels. `quality` accepts 1–100, is ignored for PNG and controls effort for lossless WebP. `lossless=true` is accepted for PNG/WebP and rejected for JPEG. The attachment name defaults to `<name>_grayscale.png`. HTTP has no `format` field and returns existing structured HTTP errors.
+
+Before full decode, grayscale admits the logical dimensions and an estimated working set of `12*width*height` bytes plus `16*(width+2)` bytes for FS row buffers. This is a conservative admission estimate, not an exact process-memory ceiling. Exceeding `--max-working-bytes` returns `413 image_too_large`. Resize before dithering in a separate operation.
+
+```bash
+curl --fail-with-body -H "Authorization: Bearer $ITB_API_TOKEN" \
+  -F 'input=@photo.jpg' -F 'levels=16' -F 'dither=fs' -F 'to=png' \
+  "$API/grayscale" -o eink.png
+```
 
 ### Barcode generation and decoding
 

@@ -607,7 +607,7 @@ QR 输出边长为 `(矩阵模块数 + 2 × border) × module-size`。一维码�
 
 ### 功能范围
 
-- **图片操作**：`compress`、`resize`、`crop`、`rotate`、`convert`、`watermark`、`inspect`、`barcode/generate`、`barcode/decode`
+- **图片操作**：`compress`、`resize`、`crop`、`rotate`、`convert`、`grayscale`、`watermark`、`inspect`、`barcode/generate`、`barcode/decode`
 - **不提供**：S3 管理、WebUI、工作流、用户系统、数据库或任务队列
 
 条码生成和解码使用 `POST /api/v1/barcode/generate` / `decode`，请求均为 multipart。生成字段为 `symbology`、`data` 和 CLI 同名选项，返回 PNG；解码上传 `input` 并可提供逗号分隔的 `symbology`，返回 `itb.barcode.decode.v1` JSON。两者复用认证、并发、超时和上传限制，并在像素分配之前检查计划尺寸与工作内存。
@@ -626,7 +626,7 @@ QR 输出边长为 `(矩阵模块数 + 2 × border) × module-size`。一维码�
 | `--max-pixels` | `50000000` | 最大图片像素数（含上传图片、水印图与计划输出尺寸） |
 | `--max-dimension` | `16384` | 最大图片单边尺寸（含上传图片、水印图与计划输出尺寸） |
 | `--max-concurrent` | `2` | 最大并发图片操作数 |
-| `--max-working-bytes` | `512MiB` | 单个操作工作集内存上限（watermark、rotate、条码生成和解码等） |
+| `--max-working-bytes` | `512MiB` | 单个操作工作集内存上限（watermark、rotate、grayscale、条码生成和解码等） |
 | `--timeout` | `2m` | 单个图片操作超时 |
 | `--no-auth` | `false` | 仅 loopback 本地开发时禁用认证 |
 
