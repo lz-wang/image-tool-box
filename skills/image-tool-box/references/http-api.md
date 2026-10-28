@@ -37,9 +37,19 @@ curl --fail-with-body -X POST http://127.0.0.1:8080/api/v1/inspect \
   -H "Authorization: Bearer $ITB_API_TOKEN" -F 'input=@photo.jpg'
 ```
 
-图片处理端点使用 `multipart/form-data`。`input` 是上传文件，选项通常沿用命令行长参数名，不带 `--`；HTTP `convert` 另用 `to` 指定目标格式。没有本地路径 `output` 或 `in-place` 参数。
+图片处理端点使用 `multipart/form-data`。`input` 是上传文件，选项通常沿用命令行长参数名，不带 `--`；HTTP `convert`、`grayscale` 另用 `to` 指定目标格式。没有本地路径 `output` 或 `in-place` 参数。
 
 图片结果是二进制，带 `Content-Disposition` 与 `X-ITB-*-Size` 响应头；检查和条码解码返回 JSON。保存响应后检查 HTTP 成功状态和实际文件类型，避免将错误响应当作图片。
+
+## 灰度接口
+
+```bash
+curl --fail-with-body -X POST http://127.0.0.1:8080/api/v1/grayscale \
+  -H "Authorization: Bearer $ITB_API_TOKEN" \
+  -F 'input=@photo.jpg' -F 'levels=16' -F 'dither=fs' -F 'to=png' -o eink.png
+```
+
+字段为 `input`、`levels`（默认 256）、`dither`（none）、`background`（#FFFFFF）、`to`（png）、`quality`（90）、`lossless`（false）。参数规则见 [灰度转换](image-operations.md#灰度转换)。PNG 为不透明 Gray8；HTTP 不接受 `format`。完整解码前按逻辑尺寸检查工作集 `12WH`，FS 另加 `16(W+2)`；超限返回 `413 image_too_large`。
 
 ## 条码接口
 
@@ -68,6 +78,6 @@ curl --fail-with-body -X POST http://127.0.0.1:8080/api/v1/barcode/decode \
 | `--timeout` | `2m` | 单操作超时 |
 | `--no-auth` | `false` | 仅回环开发时关闭认证 |
 
-支持 `/api/v1/compress`、`resize`、`crop`、`rotate`、`convert`、`watermark`、`inspect`、`barcode/generate`、`barcode/decode`，以及健康检查。API 不暴露 `compare` 或 S3 管理，也不提供 WebUI、用户系统、数据库、工作流或任务队列。
+支持 `/api/v1/compress`、`resize`、`crop`、`rotate`、`convert`、`grayscale`、`watermark`、`inspect`、`barcode/generate`、`barcode/decode`，以及健康检查。API 不暴露 `compare` 或 S3 管理，也不提供 WebUI、用户系统、数据库、工作流或任务队列。
 
 每个请求有独立临时目录，响应结束后清理。条码生成、解码和旋转等操作先进行尺寸、像素及工作集准入，再分配图像内存。图片参数约束见 [图片处理](image-operations.md)，码制与解码结果见 [二维码与条码](barcode.md)。

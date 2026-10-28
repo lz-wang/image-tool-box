@@ -4,6 +4,17 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- 新增纯 Go `grayscale <src> [dst]`：BT.601 风格 Gray8、所有输出统一透明度合成、2/4/16/256 灰阶、蛇形 Floyd–Steinberg 和 Bayer 4×4 抖动；默认白底、256 灰阶、无抖动、`<name>_grayscale.png`。复用 JPEG/PNG/WebP 与 EXIF 归一化，无新依赖或原生工具。
+- 新增 `POST /api/v1/grayscale`，支持与 CLI 一致的领域选项及 transport-only `to`（默认 png），完整解码前按逻辑尺寸和工作集准入；沿用认证、并发、超时、独立临时目录和二进制响应。
+- 同步双语 README、API、Agent 契约和项目 Skill，补充墨水屏先缩放后抖动的流程与 PNG Gray8/有损编码边界。成功为文本，CLI `--format json` 失败沿用 `itb.error.v1`，没有新增或变更成功 schema。
+
+### Fixed
+
+- 灰度输出采用同目录临时文件完整编码、同步、关闭后替换，拒绝输入别名，编码或提交前失败保留已有目标并清理暂存文件。
+- 修复编译后二进制通过绝对路径运行时，flag 解析失败的 `itb.error.v1.operation` 为空；现在跳过 argv[0] 后识别命令名。
+
 ## [v0.10.1] - 2026-10-03
 
 本版本收齐条码能力迁移的兼容性修复：Code128 输入限制、输出父目录、完整文字尺寸、Unix PNG `0644` 权限及六平台文件提交回归验收。JSON schema 保持不变。

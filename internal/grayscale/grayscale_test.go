@@ -2,11 +2,14 @@ package grayscale
 
 import (
 	"bytes"
+	"errors"
 	"image"
 	"image/color"
 	"image/png"
+	"io"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -70,7 +73,7 @@ func TestConvertFile(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			defer f.Close()
+			defer func() { _ = f.Close() }() // Read-only descriptor; decode errors are checked below.
 			img, _, err := image.Decode(f)
 			if err != nil {
 				t.Fatal(err)
@@ -141,5 +144,87 @@ func TestInvalidOptions(t *testing.T) {
 	}
 	if _, err := Apply(image.NewGray(image.Rectangle{}), Options{}); err == nil {
 		t.Fatal("empty accepted")
+	}
+}
+
+func TestCommitFailureSafety(t *testing.T) {
+	dir := t.TempDir()
+	src := writeSource(t, dir)
+	dst := filepath.Join(dir, "target.png")
+	if err := os.WriteFile(dst, []byte("keep"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	failure := errors.New("encoder stopped")
+	err := commitFile(src, dst, func(w io.Writer) error {
+		if _, err := w.Write([]byte("partial")); err != nil {
+			return err
+		}
+		return failure
+	})
+	if !errors.Is(err, failure) {
+		t.Fatal(err)
+	}
+	got, err := os.ReadFile(dst)
+	if err != nil || string(got) != "keep" {
+		t.Fatal(string(got), err)
+	}
+	// A directory destination forces a failure after full encoding and close.
+	blocked := filepath.Join(dir, "blocked.png")
+	if err := os.Mkdir(blocked, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := ConvertFile(src, blocked, Options{}); err == nil {
+		t.Fatal("directory replaced")
+	}
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, entry := range entries {
+		if strings.HasPrefix(entry.Name(), ".itb-grayscale-") {
+			t.Fatal("temporary file left behind", entry.Name())
+		}
+	}
+}
+
+type genericImage struct{ image.Image }
+
+func TestPixelTypesMatchGenericConversion(t *testing.T) {
+	bounds := image.Rect(7, 9, 14, 12)
+	nrgba := image.NewNRGBA(bounds)
+	rgba := image.NewRGBA(bounds)
+	gray := image.NewGray(bounds)
+	wide := image.NewNRGBA64(bounds)
+	yuv := image.NewYCbCr(bounds, image.YCbCrSubsampleRatio420)
+	for y := bounds.Min.Y; y < bounds.Max.Y; y++ {
+		for x := bounds.Min.X; x < bounds.Max.X; x++ {
+			c := color.NRGBA{R: uint8(x * 17), G: uint8(y * 13), B: 91, A: uint8((x - 7) * 42)}
+			nrgba.SetNRGBA(x, y, c)
+			rgba.Set(x, y, c)
+			gray.Set(x, y, c)
+			wide.Set(x, y, c)
+		}
+	}
+	for i := range yuv.Y {
+		yuv.Y[i] = uint8(i * 11)
+	}
+	for i := range yuv.Cb {
+		yuv.Cb[i] = 100
+		yuv.Cr[i] = 180
+	}
+	for name, src := range map[string]image.Image{"nrgba": nrgba, "rgba": rgba, "gray": gray, "64-bit": wide, "ycbcr": yuv} {
+		t.Run(name, func(t *testing.T) {
+			got, err := Apply(src, Options{})
+			if err != nil {
+				t.Fatal(err)
+			}
+			want, err := Apply(genericImage{src}, Options{})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !bytes.Equal(got.Pix, want.Pix) {
+				t.Fatalf("pixel conversion differs: %v vs %v", got.Pix, want.Pix)
+			}
+		})
 	}
 }

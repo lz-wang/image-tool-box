@@ -28,7 +28,7 @@ go vet ./...            # 静态检查
 ### 适配器与领域层边界
 
 - Domain 包是图片操作参数的唯一 Normalize/Validate 与业务规则来源。CLI 和 HTTP 只能将传输参数映射为领域 `Options`，不得通过调用 `cli.Command` 或复制业务分派来复用逻辑。
-- HTTP API 只暴露 `compress`、`resize`、`crop`、`rotate`、`convert`、`watermark`、`inspect`、`barcode/generate` 和 `barcode/decode`；S3 管理能力只由 CLI 暴露。
+- HTTP API 只暴露 `compress`、`resize`、`crop`、`rotate`、`convert`、`grayscale`、`watermark`、`inspect`、`barcode/generate` 和 `barcode/decode`；S3 管理能力只由 CLI 暴露。
 - CLI 图像命令以 `<src>` / `[dst]` operand 传递本地路径；HTTP 的 `input` 是对应 `<src>` 的 multipart 上传文件，操作选项通常沿用 CLI long flag 名称，`output` 与 `in-place` 不属于 HTTP 参数。HTTP `convert` 保留 transport-only `to`，由 adapter 构造临时输出路径；`internal/convert` 始终只从 outputPath 扩展名确定目标格式。`itb compare <src> <dst>` 是只读分析命令：两个 operand 都是输入（`dst` 是比较目标而非输出文件），因此 compare 绝不调用 `RejectSameFile`，同一文件自我比较合法。
 - File-transform domain APIs own file-safety invariants. An output path must not resolve to the same underlying file as any input resource, including equivalent paths, hard links, and symlinks. In image-watermark mode the watermark image is also an input resource. In-place mutation must use an explicit temporary-file + atomic replacement workflow; adapters must not bypass this rule.
 - HTTP API 是可信远程服务而非远程 Shell：不提供 WebUI、工作流、用户系统、数据库、任务队列、TLS/ACME 或 API S3 管理能力。
@@ -44,7 +44,7 @@ main.go ──→ internal/cmd（CLI）──→ 各领域包 (compress/resize/c
 ```
 
 - `internal/cmd`：所有 `cli.Command` 定义、flag 绑定、文件 IO 与错误打印。命令逻辑只做参数解析和编排，真正处理委托给领域包。失败输出统一经 `ExecuteArgs`：请求 `--format json` 时任何失败在 stdout 输出恰好一份 `itb.error.v1` 文档并返回 `ErrReported`（main 不再向 stderr 重复打印）；Action 以 `operationError("<op>", err)` 标注操作名。
-- 领域包（`resize`、`convert`、`crop`、`rotate`、`watermark`、`compress`、`compare`、`s3`、`inspect`）：接受 `Options` 结构体、操作 `image.Image` 或文件路径，**不依赖 urfave/cli**。这种解耦使 Web API 能直接复用领域包的处理函数。
+- 领域包（`resize`、`convert`、`grayscale`、`crop`、`rotate`、`watermark`、`compress`、`compare`、`s3`、`inspect`）：接受 `Options` 结构体、操作 `image.Image` 或文件路径，**不依赖 urfave/cli**。这种解耦使 Web API 能直接复用领域包的处理函数。
 - `internal/imageio`：跨领域共享的格式归一化（`NormalizeFormat`/`FormatFromPath`）、保存（`Save`/`SaveWithFormat`）、编码（`Encode`，含 JPEG/PNG/WEBP）、透明图铺底（`Flatten`）、十六进制颜色解析（`ParseHexColor`）。新增格式编解码应集中在这里。
 - `internal/s3`：存储后端，通过 `cmd/s3.go` 暴露为子命令。`ITB_S3_*` 环境变量由 CLI 层（urfave/cli 的 `Sources`）解析注入，优先级为 CLI flag > 环境变量 > 默认值；`internal/s3` 是纯领域包，自身不读取环境变量。注意：存储后端仅暴露为 CLI 子命令，HTTP API 不提供任何存储相关 API。
 - `internal/filehash`：跨命令共享的文件哈希 utility（单遍流式多算法摘要 + 读取后可观察变化检测 `VerifyUnchanged`）。inspect/selective hashing、compress 报告与 S3 上传快照共用；不提供 CLI 命令。
@@ -102,6 +102,13 @@ main.go ──→ internal/cmd（CLI）──→ 各领域包 (compress/resize/c
 - 尺寸不一致直接报错，绝不隐式 resize/crop/pad；identical 的 PSNR 输出 `+Inf`，不用有限数值替代。
 - 颜色契约：都不透明比较 R/G/B；任一图存在 alpha != 255 时切换为 premultiplied R/G/B + A（itb 自定义 alpha-aware 变体）。
 - 仅由 CLI 暴露，不进入 HTTP API；输入统一走 `imageio.OpenStatic`（JPEG EXIF Orientation 已归一化）。
+
+### grayscale 契约
+
+- `internal/grayscale` 独占 Options 默认值、校验、BT.601 风格非线性 luma、透明度合成、量化与抖动；输出 `*image.Gray`、零原点、不改变逻辑尺寸。
+- 默认 256 灰阶、白色不透明背景、无抖动；2/4/16 灰阶支持蛇形 FS（两行 float64 误差缓存）和固定 Bayer 4×4。PNG 始终 Gray8，不按灰阶数打包 Gray4/Gray1；有损编码可能改变离散灰度值。
+- `ConvertFile` 是 CLI/HTTP 文件入口：JPEG/PNG/WebP + EXIF 归一化，拒绝同文件/硬链接/符号链接，按最终目标扩展名编码，同目录完整暂存后替换；提交前失败保留旧目标。所有格式均先合成不透明背景。
+- HTTP `grayscale` 与 `convert` 一样保留 transport-only `to`；默认 png。Probe 后、完整解码前调用 `ResolveWorkingSet`，按 `12WH` + FS 的 `16(W+2)` 估算准入（非进程内存硬上限）。CLI 默认 `<name>_grayscale.png`；`--format json` 仅改变失败输出，成功为文本。
 
 ### rotate 契约
 

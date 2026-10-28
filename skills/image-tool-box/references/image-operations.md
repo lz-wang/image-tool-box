@@ -4,7 +4,7 @@
 
 ## 输入与输出
 
-`resize`、`crop`、`rotate`、`convert`、`watermark` 及 `compare` 接受 JPEG/PNG/WebP；GIF/BMP/TIFF 不用于这些操作，也不会将动画 GIF 静默截为首帧。JPEG 的 EXIF 方向会先应用到像素，因此裁剪、缩放和比较使用实际显示方向的逻辑尺寸。
+`resize`、`crop`、`rotate`、`convert`、`grayscale`、`watermark` 及 `compare` 接受 JPEG/PNG/WebP；GIF/BMP/TIFF 不用于这些操作，也不会将动画 GIF 静默截为首帧。JPEG 的 EXIF 方向会先应用到像素，因此裁剪、缩放和比较使用实际显示方向的逻辑尺寸。
 
 默认保留原图。省略输出路径时，变换命令在文件名中添加 `_compressed`、`_cropped`、`_resized`、`_rotated` 或 `_watermarked`；`convert` 必须显式提供输出路径。已有独立输出可能被替换，执行前检查所选路径；输出不得指向任何输入的同一实际文件。
 
@@ -86,6 +86,24 @@ itb convert photo.jpg photo.png
 - `-q, --quality` 默认为 `80`：JPEG/有损 WebP 使用质量；无损 WebP 使用编码努力程度；PNG 忽略它。
 - `--lossless` 启用无损 WebP；PNG 始终无损，该参数对 PNG 不产生额外效果。
 - `--background` 默认为 `#FFFFFF`，只用于转 JPEG 时给透明区域铺不透明底色；PNG/WebP 保留透明度。
+
+## 灰度转换
+
+```bash
+itb grayscale photo.jpg
+itb grayscale --levels 16 --dither fs photo.jpg eink.png
+itb grayscale --levels 4 --dither ordered photo.png output.png
+itb grayscale --background '#FFFFFF' transparent.webp output.png
+itb resize --width 800 photo.jpg resized.png
+itb grayscale --levels 16 --dither fs resized.png eink.png
+```
+
+- 默认 `<name>_grayscale.png`、256 灰阶、无抖动，保持逻辑尺寸；目标扩展名决定 PNG/JPEG/WebP 编码。
+- `--levels`：2/4/16/256；`--dither`：none/fs/ordered，抖动要求少于 256 灰阶。FS 为蛇形误差扩散，ordered 为 Bayer 4×4；先缩放后抖动。
+- 所有输出格式均先将透明度合成到 `--background`（默认白色），颜色必须不透明。PNG 输出 Gray8，16 灰阶不代表 Gray4 打包。
+- `-q, --quality` 默认 90，范围 1–100，PNG 忽略；`--lossless` 启用无损 WebP，对 PNG 无额外效果，JPEG 拒绝。有损编码可能改变离散灰度值，需要精确灰阶时使用 PNG 或无损 WebP。
+- 成功输出文本；`--format json` 仅令失败返回 `itb.error.v1`。完整暂存后替换输出，提交前失败保留旧目标；Unix 原子替换，Windows 不保证原子性。
+- 墨水屏照片先试 16 灰阶 + FS，文字/漫画先试无抖动；在目标设备检查结果。无设备 Profile、亮度/对比度调整或硬件像素打包功能。
 
 ## 水印
 

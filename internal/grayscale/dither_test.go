@@ -70,6 +70,27 @@ func TestDitherGolden(t *testing.T) {
 	}
 }
 
+func TestQuantizationGradient(t *testing.T) {
+	src := image.NewGray(image.Rect(0, 0, 256, 1))
+	for i := range src.Pix {
+		src.Pix[i] = uint8(i)
+	}
+	for _, levels := range []int{2, 4, 16, 256} {
+		t.Run(fmt.Sprint(levels), func(t *testing.T) {
+			got, err := Apply(src, Options{Levels: levels})
+			if err != nil {
+				t.Fatal(err)
+			}
+			for i, v := range got.Pix {
+				want := uint8(((i*(levels-1) + 127) / 255) * (255 / (levels - 1)))
+				if v != want {
+					t.Fatalf("input %d got %d want %d", i, v, want)
+				}
+			}
+		})
+	}
+}
+
 func BenchmarkApply(b *testing.B) {
 	src := image.NewGray(image.Rect(0, 0, 1024, 768))
 	for _, mode := range []Dither{DitherNone, DitherFS, DitherOrdered} {

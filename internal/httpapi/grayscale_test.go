@@ -3,6 +3,7 @@ package httpapi
 import (
 	"bytes"
 	"image"
+	"image/color"
 	"image/png"
 	"net/http"
 	"net/http/httptest"
@@ -15,7 +16,17 @@ import (
 )
 
 func TestGrayscaleHTTP(t *testing.T) {
-	input := formFile{field: "input", filename: "photo.png", content: testPNG(t, 32, 16)}
+	srcImage := image.NewNRGBA(image.Rect(0, 0, 32, 16))
+	for y := range 16 {
+		for x := range 32 {
+			srcImage.SetNRGBA(x, y, color.NRGBA{R: uint8(x * 8), G: uint8(y * 16), B: 90, A: uint8(80 + x*5)})
+		}
+	}
+	var encoded bytes.Buffer
+	if err := png.Encode(&encoded, srcImage); err != nil {
+		t.Fatal(err)
+	}
+	input := formFile{field: "input", filename: "photo.png", content: encoded.Bytes()}
 	for _, tc := range []struct {
 		name   string
 		fields map[string]string
@@ -149,5 +160,24 @@ func TestGrayscaleConcurrentOptions(t *testing.T) {
 		if rr != want || g != want || b != want || a != 65535 {
 			t.Fatalf("background leaked: %d %d %d %d", rr, g, b, a)
 		}
+	}
+}
+
+func TestGrayscaleEXIF(t *testing.T) {
+	for _, orientation := range []uint16{1, 2, 3, 4, 5, 6, 7, 8} {
+		t.Run(string(rune('0'+orientation)), func(t *testing.T) {
+			w := httptest.NewRecorder()
+			mustNew(t, Config{NoAuth: true}).ServeHTTP(w, newMultipartRequest(t, http.MethodPost, "/api/v1/grayscale", nil, formFile{field: "input", filename: "photo.jpg", content: orientedJPEG(t, orientation, 16, 8)}))
+			if w.Code != 200 {
+				t.Fatal(w.Code, w.Body.String())
+			}
+			want := image.Rect(0, 0, 16, 8)
+			if orientation >= 5 {
+				want = image.Rect(0, 0, 8, 16)
+			}
+			if got := decodePNG(t, w.Body.Bytes()).Bounds(); got != want {
+				t.Fatalf("bounds %v want %v", got, want)
+			}
+		})
 	}
 }
