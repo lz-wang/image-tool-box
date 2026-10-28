@@ -40,6 +40,8 @@ Unknown fields, duplicate fields, and legacy `file`, `watermark`, or `options` f
 
 ### Grayscale conversion
 
+An invalid grayscale `to` (e.g. `avif`) returns `400 invalid_argument`; unsupported input media still returns `415 unsupported_format`. Server-side upload/output storage errors and output encoding/close/commit failures return `500 internal_error` with a generic message. Grayscale's atomic file commit and the shared image save path preserve typed output errors for this distinction.
+
 Omitted `levels` and `quality` use their domain defaults (256 and 90). Explicit `0` or an empty value for either field returns `400 invalid_argument`, matching the CLI's rejection of zero values. Direct domain callers can still use `Options{}` to request defaults.
 
 `grayscale` accepts JPEG/PNG/WebP with JPEG EXIF normalization, keeps dimensions unchanged and returns opaque grayscale pixels. Defaults: `levels=256`, `dither=none`, `background=#FFFFFF`, `to=png`, `quality=90`, `lossless=false`. `levels` is an integer (`2`/`4`/`16`/`256`); `dither` is `none`, serpentine `fs`, or 4×4 Bayer `ordered`. Dithering requires fewer than 256 levels. Background is composited before luma conversion for **all** output formats and must be opaque. Unlike convert, grayscale does not preserve alpha.

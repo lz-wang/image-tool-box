@@ -11,6 +11,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"imagetoolbox/internal/imageio"
 )
 
 func TestApplyLuma(t *testing.T) {
@@ -164,6 +166,10 @@ func TestCommitFailureSafety(t *testing.T) {
 	if !errors.Is(err, failure) {
 		t.Fatal(err)
 	}
+	var outputErr *imageio.OutputError
+	if !errors.As(err, &outputErr) {
+		t.Fatalf("encoding failure lost output type: %v", err)
+	}
 	got, err := os.ReadFile(dst)
 	if err != nil || string(got) != "keep" {
 		t.Fatal(string(got), err)
@@ -173,8 +179,8 @@ func TestCommitFailureSafety(t *testing.T) {
 	if err := os.Mkdir(blocked, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if err := ConvertFile(src, blocked, Options{}); err == nil {
-		t.Fatal("directory replaced")
+	if err := ConvertFile(src, blocked, Options{}); !errors.As(err, &outputErr) {
+		t.Fatalf("commit failure lost output type: %v", err)
 	}
 	entries, err := os.ReadDir(dir)
 	if err != nil {

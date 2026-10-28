@@ -17,6 +17,7 @@ import (
 	"imagetoolbox/internal/barcode"
 	"imagetoolbox/internal/filehash"
 	"imagetoolbox/internal/grayscale"
+	"imagetoolbox/internal/imageio"
 	"imagetoolbox/internal/s3"
 )
 
@@ -298,7 +299,11 @@ func classifyError(err error) MachineErrorInfo {
 		}
 	}
 
-	// Barcode domain errors use the existing stable error codes.
+	// Image and barcode domain errors use the existing stable error codes.
+	var outputErr *imageio.OutputError
+	if errors.As(err, &outputErr) {
+		return MachineErrorInfo{Code: CodeInternal, Message: err.Error()}
+	}
 	switch {
 	case errors.Is(err, grayscale.ErrInvalidOptions):
 		return MachineErrorInfo{Code: CodeInvalidArgument, Message: err.Error()}
@@ -310,6 +315,10 @@ func classifyError(err error) MachineErrorInfo {
 		return MachineErrorInfo{Code: CodeUnsupportedCapability, Message: err.Error()}
 	case errors.Is(err, barcode.ErrInvalidImage) && !errors.Is(err, fs.ErrNotExist):
 		return MachineErrorInfo{Code: CodeFileRead, Message: err.Error()}
+	case errors.Is(err, imageio.ErrUnsupportedFormat):
+		// Keep more specific domain contracts (e.g. barcode invalid-image) above
+		// this shared fallback for transforms that expose the imageio sentinel.
+		return MachineErrorInfo{Code: CodeInvalidArgument, Message: err.Error()}
 	}
 
 	// 本地文件系统错误：消息可安全携带本地路径

@@ -76,9 +76,13 @@ func TestGrayscaleBinaryE2E(t *testing.T) {
 	for _, ext := range []string{"gif", "bmp", "tiff"} {
 		t.Run("reject "+ext, func(t *testing.T) {
 			input := writeE2EImage(t, dir, "unsupported."+ext)
-			_, _, code := runE2E(t, binary, dir, "grayscale", input, "bad.png")
-			if code == 0 {
-				t.Fatal("unsupported input accepted")
+			out, stderr, code := runE2E(t, binary, dir, "grayscale", "--format", "json", input, "bad.png")
+			if code == 0 || stderr != "" {
+				t.Fatalf("%d %s %s", code, out, stderr)
+			}
+			doc := decodeSingleJSON(t, out)
+			if doc["schema_version"] != MachineErrorSchemaVersion || doc["operation"] != "grayscale" || doc["error"].(map[string]any)["code"] != CodeInvalidArgument {
+				t.Fatal(doc)
 			}
 		})
 	}

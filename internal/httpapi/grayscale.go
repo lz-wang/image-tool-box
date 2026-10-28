@@ -44,7 +44,7 @@ func grayscaleImage(_ context.Context, f form, dir string, cfg Config) (string, 
 	}
 	format, err := imageio.NormalizeFormat(to)
 	if err != nil {
-		return "", "", 0, err
+		return "", "", 0, fmt.Errorf("%w: invalid to parameter: %w", errInvalidArgument, err)
 	}
 	info, err := imageio.Probe(input.Path)
 	if err != nil {

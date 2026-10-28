@@ -43,6 +43,8 @@ curl --fail-with-body -X POST http://127.0.0.1:8080/api/v1/inspect \
 
 ## 灰度接口
 
+显式零值或空的 `levels`/`quality` 及非法 `to` 返回 `400 invalid_argument`；不支持的输入媒体返回 `415 unsupported_format`。服务端存储、编码和提交错误返回 `500 internal_error`，不要将其当作参数错误重试相同请求。
+
 ```bash
 curl --fail-with-body -X POST http://127.0.0.1:8080/api/v1/grayscale \
   -H "Authorization: Bearer $ITB_API_TOKEN" \

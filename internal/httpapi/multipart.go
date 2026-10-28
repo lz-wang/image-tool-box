@@ -1,6 +1,7 @@
 package httpapi
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -8,6 +9,8 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+
+	"imagetoolbox/internal/imageio"
 )
 
 // uploadedFile 区分服务端存储路径与客户端提供的原始文件名：
@@ -85,16 +88,20 @@ func parseMultipart(w http.ResponseWriter, r *http.Request, dir string, cfg Conf
 		}
 		tmp, err := os.CreateTemp(dir, tempPrefix(name)+"-*"+filepath.Ext(original))
 		if err != nil {
-			return form{}, err
+			return form{}, &imageio.OutputError{Err: err}
 		}
 		path := tmp.Name()
 		_, copyErr := io.Copy(tmp, part)
 		closeErr := tmp.Close()
 		if copyErr != nil {
+			var pathErr *os.PathError
+			if errors.As(copyErr, &pathErr) {
+				return form{}, &imageio.OutputError{Err: copyErr}
+			}
 			return form{}, copyErr
 		}
 		if closeErr != nil {
-			return form{}, closeErr
+			return form{}, &imageio.OutputError{Err: closeErr}
 		}
 		f.files[name] = uploadedFile{Path: path, OriginalName: original}
 	}

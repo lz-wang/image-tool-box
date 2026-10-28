@@ -12,4 +12,6 @@ var (
 	ErrImageTooLarge = errors.New("image too large")
 	// errMissingInput 表示请求缺少必填的 input 文件。
 	errMissingInput = errors.New("missing input")
+	// errInvalidArgument distinguishes invalid transport options from unsupported input media.
+	errInvalidArgument = errors.New("invalid argument")
 )

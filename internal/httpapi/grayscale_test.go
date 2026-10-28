@@ -44,6 +44,7 @@ func TestGrayscaleHTTP(t *testing.T) {
 		{"levels empty", map[string]string{"levels": ""}, Config{NoAuth: true}, 400},
 		{"number", map[string]string{"levels": "x"}, Config{NoAuth: true}, 400},
 		{"quality", map[string]string{"quality": "101"}, Config{NoAuth: true}, 400},
+		{"unsupported output", map[string]string{"to": "avif"}, Config{NoAuth: true}, 400},
 		{"quality zero", map[string]string{"quality": "0"}, Config{NoAuth: true}, 400},
 		{"quality empty", map[string]string{"quality": ""}, Config{NoAuth: true}, 400},
 		{"background", map[string]string{"background": "#00000000"}, Config{NoAuth: true}, 400},

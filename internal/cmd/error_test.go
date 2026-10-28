@@ -18,8 +18,29 @@ import (
 
 	"github.com/aws/smithy-go"
 
+	"imagetoolbox/internal/barcode"
+	"imagetoolbox/internal/imageio"
 	"imagetoolbox/internal/s3"
 )
+
+func TestImageErrorClassificationPrecedence(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		err  error
+		want string
+	}{
+		{"unsupported transform", fmt.Errorf("input: %w", imageio.ErrUnsupportedFormat), CodeInvalidArgument},
+		{"invalid barcode image", fmt.Errorf("%w: %w", barcode.ErrInvalidImage, imageio.ErrUnsupportedFormat), CodeFileRead},
+		{"output storage", &imageio.OutputError{Err: fs.ErrNotExist}, CodeInternal},
+		{"input missing", fs.ErrNotExist, CodeFileNotFound},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := classifyError(tc.err); got.Code != tc.want || got.Retryable {
+				t.Fatalf("got %+v want %s", got, tc.want)
+			}
+		})
+	}
+}
 
 // TestRequestsJSONOutput 锁定 transport 层窄检测：仅 `--format json`
 // 与 `--format=json`（大小写不敏感）触发机器可读失败输出。

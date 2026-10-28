@@ -155,18 +155,25 @@ func Save(path string, img image.Image, opts SaveOptions) error {
 	return SaveWithFormat(path, img, format, opts)
 }
 
-func SaveWithFormat(path string, img image.Image, format Format, opts SaveOptions) error {
+func SaveWithFormat(path string, img image.Image, format Format, opts SaveOptions) (err error) {
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		return err
+		return &OutputError{Err: err}
 	}
 
 	out, err := os.Create(path)
 	if err != nil {
-		return err
+		return &OutputError{Err: err}
 	}
-	defer out.Close()
+	defer func() {
+		if closeErr := out.Close(); err == nil && closeErr != nil {
+			err = &OutputError{Err: closeErr}
+		}
+	}()
 
-	return Encode(out, img, format, opts)
+	if err := Encode(out, img, format, opts); err != nil {
+		return &OutputError{Err: err}
+	}
+	return nil
 }
 
 func Encode(w io.Writer, img image.Image, format Format, opts SaveOptions) error {

@@ -12,6 +12,9 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed
 
+- CLI 共享映射将 `imageio.ErrUnsupportedFormat` 从 `E_INTERNAL` 修正为现有 `E_INVALID_ARGUMENT`，补齐 GIF/BMP/TIFF 的单 JSON 文档 E2E 断言。`itb.error.v1` 字段、版本及错误码集合不变。
+- 灰度 HTTP 非法输出 `to` 返回 `400 invalid_argument`，不支持的输入仍为 415。共享 `imageio.OutputError` 区分服务端输出创建、编码、关闭、提交故障，灰度原子提交、共享保存及上传存储路径保留该类型，HTTP 返回通用 500 而不泄漏内部路径；CLI 输出故障归为 `E_INTERNAL`。
+
 - 灰度转换移除无条件 `chmod 0644`：Unix 新输出使用私有临时文件权限（0600 受 umask 限制），替换已有普通目标时保留其权限；符号链接替换保持私有权限，不继承或修改其目标。增加隔离子进程 umask 077、0600/0400/0640 覆盖及失败回滚测试。
 
 - 灰度 CLI/API 对显式传入的 `levels=0`、`quality=0` 返回参数错误，HTTP 空值同样拒绝；省略参数与领域 `Options{}` 仍使用 256 灰阶和质量 90。两种 adapter 共用领域数值校验，修复 HTTP `quality=0` 被默认化的不一致。

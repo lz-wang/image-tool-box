@@ -312,6 +312,8 @@ Defaults apply only when parameters are omitted; explicitly supplying `levels=0`
 
 On Unix, new outputs use private permissions (0600, further restricted by umask); replacing an existing regular file preserves its permissions. Replacing a symlink keeps private permissions and leaves its target untouched. Failures retain the old file's content and permissions. Windows permissions follow the operating system's model.
 
+Image-transform commands return CLI `E_INVALID_ARGUMENT` for unsupported input/output formats; barcode decoding retains its domain contract `E_FILE_READ` for invalid images. The grayscale HTTP endpoint returns `400 invalid_argument` for an invalid `to` parameter, `415 unsupported_format` for unsupported input media, and `500 internal_error` for server-side output creation, encoding, close or commit failures, without exposing internal paths.
+
 PNG always uses single-channel Gray8: `--levels 16` restricts pixel values to 16 levels, without Gray4 packing. JPEG/WebP do not promise single-channel encoding, and lossy encoding may change quantized values; use PNG or lossless WebP to preserve the exact levels. Output is fully staged in the destination directory before replacement, preserving existing targets on pre-commit failures; Unix rename replacement is atomic, Windows does not guarantee atomicity.
 
 For e-ink photos, try 16 levels + FS; try no dithering for text/comics. Resize before dithering so interpolation does not alter the discrete gray distribution, and check results on the target device. Defaults are 256 levels without dithering. Device profiles, brightness/contrast enhancement and hardware pixel packing are outside this command's scope.
@@ -711,7 +713,7 @@ Stable error code list:
 
 | Code | Meaning |
 |--------|------|
-| `E_INVALID_ARGUMENT` | Invalid arguments (flag parse errors, operand count and flag combination conflicts) |
+| `E_INVALID_ARGUMENT` | Invalid arguments (flag parse errors, operand count and flag combination conflicts, unsupported image formats) |
 | `E_INVALID_CONFIG` | Incomplete connection configuration (endpoint/bucket, etc.) |
 | `E_FILE_NOT_FOUND` | Local file does not exist |
 | `E_FILE_READ` | Local file read failure (permissions, etc.) |

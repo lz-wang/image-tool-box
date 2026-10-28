@@ -310,6 +310,8 @@ itb grayscale --levels 16 --dither fs resized.png eink.png
 
 Unix 上新输出使用私有权限（0600，再受 umask 限制），替换已有普通文件时保留其权限；替换符号链接时保持私有权限且不修改链接目标。失败保留旧文件的内容和权限。Windows 的权限按操作系统模型处理。
 
+灰度等图片变换命令不支持的输入/目标格式返回 CLI `E_INVALID_ARGUMENT`；条码解码的非法图像保留其领域契约 `E_FILE_READ`。HTTP 灰度接口的非法 `to` 参数返回 `400 invalid_argument`，不支持的输入媒体返回 `415 unsupported_format`；服务端输出创建、编码、关闭或提交失败返回 `500 internal_error`，响应不泄漏内部路径。
+
 PNG 固定输出 Gray8 单通道，`--levels 16` 表示仅使用 16 个灰度值，不是 Gray4 打包。JPEG/WebP 不承诺单通道编码，有损编码也可能改变离散灰度值；需要精确保留灰阶时使用 PNG 或无损 WebP。输出先在同目录完整暂存后替换，提交前失败保留旧目标；Unix rename 原子替换，Windows 不保证原子性。
 
 墨水屏照片可先试 16 灰阶 + FS，文字/漫画先试不抖动。先缩放、后抖动，避免插值破坏灰阶分布；最终效果需在目标设备检查。默认 256 灰阶无抖动。不提供设备 Profile、亮度/对比度增强或硬件像素打包。
@@ -697,7 +699,7 @@ stderr 不再重复打印同一错误（非 JSON 模式行为不变：错误文�
 
 | 错误码 | 含义 |
 |--------|------|
-| `E_INVALID_ARGUMENT` | 参数非法（参数解析错误、operand 数量与 flag 组合冲突） |
+| `E_INVALID_ARGUMENT` | 参数非法（参数解析错误、operand 数量与 flag 组合冲突、不支持的图片格式） |
 | `E_INVALID_CONFIG` | 连接配置不完整（endpoint/bucket 等） |
 | `E_FILE_NOT_FOUND` | 本地文件不存在 |
 | `E_FILE_READ` | 本地文件读取失败（权限等） |

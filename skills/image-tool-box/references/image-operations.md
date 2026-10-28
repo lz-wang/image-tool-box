@@ -89,6 +89,8 @@ itb convert photo.jpg photo.png
 
 ## 灰度转换
 
+参数省略才应用默认值，显式 `levels=0` 或 `quality=0` 是参数错误。Unix 新输出为私有权限（0600 受 umask 限制），覆盖已有普通文件保留其权限；失败保留旧内容与权限。不支持的图片格式通过 CLI JSON 返回 `E_INVALID_ARGUMENT`。
+
 ```bash
 itb grayscale photo.jpg
 itb grayscale --levels 16 --dither fs photo.jpg eink.png

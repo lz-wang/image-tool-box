@@ -66,11 +66,16 @@ func errorResponse(status int, err error) (string, string) {
 // operationErrorStatus 统一把领域/准入错误映射为 HTTP 状态码，
 // 全部基于 typed errors 判别，不做字符串匹配。
 func operationErrorStatus(err error) int {
+	var outputErr *imageio.OutputError
 	switch {
 	case errors.Is(err, context.Canceled), errors.Is(err, context.DeadlineExceeded):
 		return http.StatusGatewayTimeout
 	case errors.Is(err, ErrImageTooLarge):
 		return http.StatusRequestEntityTooLarge
+	case errors.As(err, &outputErr):
+		return http.StatusInternalServerError
+	case errors.Is(err, errInvalidArgument):
+		return http.StatusBadRequest
 	case errors.Is(err, barcode.ErrDecoderFailure), errors.Is(err, barcode.ErrDecoderUnavailable):
 		return http.StatusInternalServerError
 	case errors.Is(err, imageio.ErrUnsupportedFormat), errors.Is(err, compress.ErrUnsupportedFormat):
@@ -81,6 +86,10 @@ func operationErrorStatus(err error) int {
 }
 
 func multipartErrorStatus(err error) int {
+	var outputErr *imageio.OutputError
+	if errors.As(err, &outputErr) {
+		return http.StatusInternalServerError
+	}
 	var maxBytesErr *http.MaxBytesError
 	if errors.As(err, &maxBytesErr) {
 		return http.StatusRequestEntityTooLarge

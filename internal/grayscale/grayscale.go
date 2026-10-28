@@ -107,11 +107,11 @@ func ConvertFile(inputPath, outputPath string, opts Options) error {
 // commitFile stages the full encoding before touching an existing destination.
 func commitFile(inputPath, outputPath string, encode func(io.Writer) error) error {
 	if err := os.MkdirAll(filepath.Dir(outputPath), 0o755); err != nil {
-		return err
+		return &imageio.OutputError{Err: err}
 	}
 	tmp, err := os.CreateTemp(filepath.Dir(outputPath), ".itb-grayscale-*")
 	if err != nil {
-		return err
+		return &imageio.OutputError{Err: err}
 	}
 	defer func() {
 		// Cleanup is best-effort; explicit Close below reports write errors.
@@ -119,7 +119,7 @@ func commitFile(inputPath, outputPath string, encode func(io.Writer) error) erro
 		_ = os.Remove(tmp.Name())
 	}()
 	if err := encode(tmp); err != nil {
-		return err
+		return &imageio.OutputError{Err: err}
 	}
 	// Only an existing regular destination supplies permissions. New files and
 	// replacements of symlinks retain the private CreateTemp mode. Lstat avoids
@@ -127,21 +127,24 @@ func commitFile(inputPath, outputPath string, encode func(io.Writer) error) erro
 	if stat, err := os.Lstat(outputPath); err == nil {
 		if stat.Mode().IsRegular() {
 			if err := tmp.Chmod(stat.Mode().Perm()); err != nil {
-				return err
+				return &imageio.OutputError{Err: err}
 			}
 		}
 	} else if !os.IsNotExist(err) {
-		return err
+		return &imageio.OutputError{Err: err}
 	}
 	if err := tmp.Sync(); err != nil {
-		return err
+		return &imageio.OutputError{Err: err}
 	}
 	if err := tmp.Close(); err != nil {
-		return err
+		return &imageio.OutputError{Err: err}
 	}
 	// Recheck aliases immediately before committing the result.
 	if err := imageio.RejectSameFile(inputPath, outputPath); err != nil {
 		return err
 	}
-	return os.Rename(tmp.Name(), outputPath)
+	if err := os.Rename(tmp.Name(), outputPath); err != nil {
+		return &imageio.OutputError{Err: err}
+	}
+	return nil
 }
