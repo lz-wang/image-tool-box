@@ -4,6 +4,10 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [v0.11.0] - 2026-10-28
+
+本版本新增独立的灰度转换 CLI 与 HTTP API，支持 Gray8、灰阶量化及墨水屏抖动，并完善参数、文件权限、错误分类与 Multipart 字段类型契约。现有 JSON schema 版本与字段保持不变。
+
 ### Added
 
 - 新增纯 Go `grayscale <src> [dst]`：BT.601 风格 Gray8、所有输出统一透明度合成、2/4/16/256 灰阶、蛇形 Floyd–Steinberg 和 Bayer 4×4 抖动；默认白底、256 灰阶、无抖动、`<name>_grayscale.png`。复用 JPEG/PNG/WebP 与 EXIF 归一化，无新依赖或原生工具。
